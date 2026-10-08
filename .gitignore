@@ -1,0 +1,51 @@
+# Private planning notes
+.projectplan/
+
+# Model weights
+*.safetensors
+*.gguf
+*.pth
+*.pt
+*.ckpt
+*.onnx
+
+# Pipeline outputs (curated examples live in examples/)
+results/
+
+# ComfyUI prototype: third-party work, never committed
+prototype/
+comfyui/
+*[Ww]orkflow*.json
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Frontend
+node_modules/
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
+.claude/
