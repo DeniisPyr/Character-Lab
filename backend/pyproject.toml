@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "charlab"
+dynamic = ["version"]
+description = "Turn one character image into a training-ready LoRA dataset."
+license = "MIT"
+authors = [{ name = "DenisPyr" }]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.6",
+    "pytest>=9.1",
+    "ruff==0.16.10",
+]
+
+[project.scripts]
+charlab = "charlab.cli:main"
+
+[tool.hatch.version]
+path = "src/charlab/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/charlab"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
