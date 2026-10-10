@@ -10,6 +10,7 @@ license = "MIT"
 authors = [{ name = "DenisPyr" }]
 requires-python = ">=3.11"
 dependencies = [
+    "pillow>=11.0",
     "pydantic>=2.10",
     "pyyaml>=6.0",
 ]
