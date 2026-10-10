@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from charlab.config import PrepareSettings
+from charlab.pipeline.stages import StageUnavailable
 
 log = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ def rembg_mask(image: Image.Image, model: str) -> Image.Image:
         # Without onnxruntime, importing rembg exits the process instead of raising.
         import rembg
     except (ImportError, SystemExit) as error:
-        raise RuntimeError(
+        raise StageUnavailable(
             "background removal needs rembg; install the package with the [gpu] extra"
         ) from error
     return rembg.remove(image, session=rembg.new_session(model), only_mask=True)

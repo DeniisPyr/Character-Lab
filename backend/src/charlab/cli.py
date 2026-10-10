@@ -1,18 +1,23 @@
 """Command-line interface for the ``charlab`` command."""
 
 import argparse
+import logging
 import re
 import sys
 import textwrap
 from collections.abc import Sequence
+from functools import partial
 from pathlib import Path
 
 from pydantic import ValidationError
 
 from charlab import __version__
 from charlab.config import load_settings
+from charlab.pipeline.generate import QwenGenerator
 from charlab.pipeline.jobs import Job, plan
-from charlab.pipeline.prepare import InvalidReference, load_reference
+from charlab.pipeline.prepare import InvalidReference, load_reference, prepare_reference
+from charlab.pipeline.runner import run
+from charlab.pipeline.stages import Stages, StageUnavailable
 from charlab.recipe import load_recipe
 
 TRIGGER = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -85,12 +90,21 @@ def _generate(args: argparse.Namespace) -> int:
         print(format_plan(jobs, header))
         return 0
 
-    print(
-        "charlab generate: the model stages are not built yet (roadmap step 2); "
-        "use --dry-run to see the plan",
-        file=sys.stderr,
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    stages = Stages(
+        prepare=partial(prepare_reference, settings=settings.prepare),
+        generate=QwenGenerator(settings.generation),
     )
-    return 1
+    try:
+        results = run(args.reference, jobs, stages)
+    except (InvalidReference, StageUnavailable) as error:
+        return _error(str(error))
+
+    out.mkdir(parents=True, exist_ok=True)
+    for result in results:
+        result.image.save(out / f"{result.job.view}_{result.job.variant}.png")
+    print(f"saved {len(results)} images to {out}")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

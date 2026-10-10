@@ -11,7 +11,8 @@ log = logging.getLogger(__name__)
 
 
 def run(reference: Path, jobs: Sequence[Job], stages: Stages) -> list[Result]:
-    """Prepare the reference once, generate every job in order, then caption all images.
+    """Prepare the reference once, generate every job in order, then caption all images
+    (if there is a caption stage).
 
     Picture 1 is always the prepared reference; a job's references follow as Picture 2, 3.
     Captioning starts only after the last image is generated, so only one model needs to be
@@ -31,6 +32,8 @@ def run(reference: Path, jobs: Sequence[Job], stages: Stages) -> list[Result]:
         images[job.key] = image
         log.info("generated %s (%d/%d)", job.key, number, len(jobs))
 
+    if stages.caption is None:
+        return [Result(job, images[job.key], None) for job in jobs]
     results = []
     for number, job in enumerate(jobs, start=1):
         results.append(Result(job, images[job.key], stages.caption(images[job.key])))

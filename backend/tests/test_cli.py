@@ -3,15 +3,31 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from charlab import __version__
+from charlab import __version__, cli
 from charlab.cli import main
+from charlab.pipeline.stages import StageUnavailable
 
 
 @pytest.fixture
 def reference(tmp_path):
     path = tmp_path / "ref.png"
-    Image.new("RGB", (512, 768), "white").save(path)
+    image = Image.new("RGB", (512, 768), "white")
+    image.paste((200, 0, 0), (200, 300, 300, 500))  # a stand-in subject on a plain background
+    image.save(path)
     return str(path)
+
+
+class FakeGenerator:
+    def __init__(self, settings):
+        self.settings = settings
+
+    def __call__(self, prompt, images, size, seed):
+        return Image.new("RGB", size, "grey")
+
+
+class NoGpu(FakeGenerator):
+    def __call__(self, prompt, images, size, seed):
+        raise StageUnavailable("generation needs an NVIDIA GPU with CUDA")
 
 
 def test_version_flag_prints_version(capsys):
@@ -92,9 +108,24 @@ def test_invalid_config_is_reported(capsys, reference, tmp_path):
     assert "Extra inputs" in capsys.readouterr().err
 
 
-def test_real_run_is_not_available_yet(capsys, reference):
-    assert main(["generate", reference, "--trigger", "mychar"]) == 1
-    assert "not built yet" in capsys.readouterr().err
+def test_real_run_saves_one_image_per_variant(capsys, monkeypatch, reference, tmp_path):
+    monkeypatch.setattr(cli, "QwenGenerator", FakeGenerator)
+    out = tmp_path / "out"
+
+    assert main(["generate", reference, "--trigger", "mychar", "--out", str(out)]) == 0
+
+    files = sorted(path.name for path in out.iterdir())
+    assert len(files) == 16
+    assert "turnaround_front.png" in files
+    assert Image.open(out / "scenes_city_walk.png").size == (1280, 720)
+    assert f"saved 16 images to {out}" in capsys.readouterr().out
+
+
+def test_unavailable_stage_is_reported(capsys, monkeypatch, reference, tmp_path):
+    monkeypatch.setattr(cli, "QwenGenerator", NoGpu)
+
+    assert main(["generate", reference, "--trigger", "mychar", "--out", str(tmp_path)]) == 2
+    assert "needs an NVIDIA GPU" in capsys.readouterr().err
 
 
 def test_trigger_is_required(reference):

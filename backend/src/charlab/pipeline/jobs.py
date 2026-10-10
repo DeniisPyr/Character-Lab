@@ -28,7 +28,7 @@ class Job:
 class Result:
     job: Job
     image: Image.Image
-    caption: str
+    caption: str | None
 
 
 def plan(recipe: Recipe, seed: int, description: str | None = None) -> list[Job]:

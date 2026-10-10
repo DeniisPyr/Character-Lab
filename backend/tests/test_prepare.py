@@ -7,6 +7,7 @@ from PIL import Image
 from charlab.config import PrepareSettings
 from charlab.pipeline import prepare
 from charlab.pipeline.prepare import InvalidReference, load_reference, prepare_reference, rembg_mask
+from charlab.pipeline.stages import StageUnavailable
 
 SETTINGS = PrepareSettings(
     max_file_mb=20,
@@ -240,5 +241,5 @@ def test_default_remover_uses_the_configured_model(tmp_path, monkeypatch):
 def test_missing_rembg_is_reported(monkeypatch):
     monkeypatch.setitem(sys.modules, "rembg", None)
 
-    with pytest.raises(RuntimeError, match=r"needs rembg; install the package with the \[gpu\]"):
+    with pytest.raises(StageUnavailable, match=r"needs rembg; .* \[gpu\] extra"):
         rembg_mask(Image.new("RGB", (512, 512)), "birefnet-general")

@@ -12,6 +12,10 @@ from typing import Protocol
 from PIL import Image
 
 
+class StageUnavailable(RuntimeError):
+    """A stage cannot run on this machine: a package or the GPU it needs is missing."""
+
+
 class Prepare(Protocol):
     def __call__(self, reference: Path) -> Image.Image:
         """Validate the reference file and return the prepared reference image."""
@@ -33,4 +37,5 @@ class Caption(Protocol):
 class Stages:
     prepare: Prepare
     generate: Generate
-    caption: Caption
+    # Without a caption stage, the results have no captions.
+    caption: Caption | None = None

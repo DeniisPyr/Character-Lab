@@ -74,6 +74,15 @@ def test_captioning_starts_after_all_images_are_generated():
     assert kinds == ["prepare"] + ["generate"] * 16 + ["caption"] * 16
 
 
+def test_without_a_caption_stage_results_have_no_captions():
+    fake = FakeStages()
+
+    results = run(REFERENCE, shipped_jobs(), Stages(fake.prepare, fake.generate))
+
+    assert [result.caption for result in results] == [None] * 16
+    assert "caption" not in [call[0] for call in fake.calls]
+
+
 def test_reference_must_be_generated_first():
     jobs = [Job("view/a", "A.", (64, 64), 1, ("view/b",)), Job("view/b", "B.", (64, 64), 2, ())]
 
