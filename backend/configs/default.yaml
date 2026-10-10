@@ -1,0 +1,19 @@
+# Pipeline settings. A user config only needs the values it changes; it is merged over these
+# defaults key by key. Relative paths are resolved from the file that sets them.
+#
+# Settings for later stages (captions, quality gate, quantization) are added with the stage
+# that uses them, with measured values, not placeholders.
+
+# Base seed. The same seed and settings reproduce the same images.
+seed: 42
+
+recipe: recipes/lora-character.yaml
+
+generation:
+  model: Qwen/Qwen-Image-Edit-2511
+  lightning_lora:
+    repo: lightx2v/Qwen-Image-Edit-2511-Lightning
+    file: Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors
+  # The Lightning LoRA is distilled for 4 steps without classifier-free guidance (CFG 1).
+  steps: 4
+  cfg: 1.0
