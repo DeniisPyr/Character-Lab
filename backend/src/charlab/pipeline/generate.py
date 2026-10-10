@@ -1,5 +1,6 @@
 """Generate stage: Qwen-Image-Edit-2511 with the Lightning 4-step LoRA."""
 
+import logging
 import math
 from collections.abc import Callable, Sequence
 from typing import Any
@@ -7,6 +8,9 @@ from typing import Any
 from PIL import Image
 
 from charlab.config import GenerationSettings
+from charlab.pipeline.stages import StageUnavailable
+
+log = logging.getLogger(__name__)
 
 # Sampler settings for the Lightning LoRA, from ModelTC's generate_with_diffusers.py
 # (github.com/ModelTC/Qwen-Image-Lightning).
@@ -41,12 +45,13 @@ def load_pipeline(settings: GenerationSettings) -> Any:
         import torch
         from diffusers import FlowMatchEulerDiscreteScheduler, QwenImageEditPlusPipeline
     except ImportError as error:
-        raise RuntimeError(
+        raise StageUnavailable(
             "generation needs torch and diffusers; install the package with the [gpu] extra"
         ) from error
     if not torch.cuda.is_available():
-        raise RuntimeError("generation needs an NVIDIA GPU with CUDA")
+        raise StageUnavailable("generation needs an NVIDIA GPU with CUDA")
 
+    log.info("loading %s (the first run downloads about 58 GB)", settings.model)
     pipe = QwenImageEditPlusPipeline.from_pretrained(
         settings.model,
         scheduler=FlowMatchEulerDiscreteScheduler.from_config(LIGHTNING_SCHEDULER),

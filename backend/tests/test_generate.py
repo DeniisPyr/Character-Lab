@@ -7,6 +7,7 @@ from PIL import Image
 from charlab.config import load_settings
 from charlab.pipeline import generate
 from charlab.pipeline.generate import QwenGenerator, load_pipeline
+from charlab.pipeline.stages import StageUnavailable
 
 SETTINGS = load_settings().generation
 
@@ -73,5 +74,5 @@ def test_missing_gpu_packages_are_reported(monkeypatch):
     monkeypatch.setitem(sys.modules, "torch", None)
     monkeypatch.setitem(sys.modules, "diffusers", None)
 
-    with pytest.raises(RuntimeError, match=r"needs torch and diffusers; .* \[gpu\] extra"):
+    with pytest.raises(StageUnavailable, match=r"needs torch and diffusers; .* \[gpu\] extra"):
         load_pipeline(SETTINGS)
