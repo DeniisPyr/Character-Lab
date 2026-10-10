@@ -19,7 +19,17 @@ dependencies = [
 [project.optional-dependencies]
 # Models for a real run. rembg runs on the CPU; it is fast enough for one image per run.
 gpu = [
+    "accelerate>=1.0",
+    # 0.37 adds the zero_cond_t option that Qwen-Image-Edit-2511 needs; older versions ignore it
+    # with only a warning and the images come out wrong.
+    "diffusers>=0.37",
+    "peft>=0.17",
     "rembg[cpu]>=2.0.85",
+    "torch>=2.6",
+    # transformers 5 needs mm_token_type_ids, which diffusers does not pass to the Qwen2.5-VL
+    # text encoder yet, so image tokens get wrong positions (diffusers issue #14194). This also
+    # caps diffusers at 0.39, the last release that allows huggingface-hub below 1.0.
+    "transformers>=4.57,<5",
 ]
 dev = [
     "pre-commit>=4.6",
