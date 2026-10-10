@@ -13,8 +13,16 @@ concurrency:
 
 jobs:
   lint-and-test:
-    name: Lint and test
-    runs-on: ubuntu-latest
+    # Linting is the same on every OS, so it runs once; the tests run on all three.
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Lint and test, os: ubuntu-latest, lint: true }
+          - { name: Test on macOS, os: macos-latest }
+          - { name: Test on Windows, os: windows-latest }
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: backend
@@ -31,9 +39,11 @@ jobs:
         run: python -m pip install -e '.[dev]'
 
       - name: Lint
+        if: matrix.lint
         run: python -m ruff check .
 
       - name: Check formatting
+        if: matrix.lint
         run: python -m ruff format --check .
 
       - name: Test
