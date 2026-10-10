@@ -26,6 +26,8 @@ gpu = [
     "peft>=0.17",
     "rembg[cpu]>=2.0.85",
     "torch>=2.6",
+    # transformers loads Qwen's processor together with a video processor that needs torchvision.
+    "torchvision>=0.21",
     # transformers 5 needs mm_token_type_ids, which diffusers does not pass to the Qwen2.5-VL
     # text encoder yet, so image tokens get wrong positions (diffusers issue #14194). This also
     # caps diffusers at 0.39, the last release that allows huggingface-hub below 1.0.

@@ -3,6 +3,7 @@
 import logging
 import math
 import shutil
+import time
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -34,7 +35,10 @@ LIGHTNING_SCHEDULER = {
 
 # Qwen-Image-Edit-2511 in bf16: transformer 40.9 GB, text encoder 16.6 GB, VAE 0.25 GB.
 BF16_WEIGHTS = 57.7e9
-TORCH_INDEX = "pip install --force-reinstall torch --index-url https://download.pytorch.org/whl"
+# torch and torchvision must come from the same CUDA build.
+TORCH_INDEX = (
+    "pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl"
+)
 
 # Takes the settings and returns a loaded pipeline. Tests pass a fake.
 Loader = Callable[[GenerationSettings], Any]
@@ -86,18 +90,25 @@ def load_pipeline(settings: GenerationSettings) -> Any:
     check_gpu(torch)
 
     log.info("loading %s (the first run downloads about 58 GB)", settings.model)
+    start = time.perf_counter()
     pipe = QwenImageEditPlusPipeline.from_pretrained(
         settings.model,
         scheduler=FlowMatchEulerDiscreteScheduler.from_config(LIGHTNING_SCHEDULER),
         torch_dtype=torch.bfloat16,
-    )
+    ).to("cuda")
+    log.info("loaded onto the GPU in %.0f s", time.perf_counter() - start)
+
+    # On the GPU, not before: PEFT fuses CPU weights in float32, which ran for over 13
+    # minutes on a 20B model without finishing.
+    start = time.perf_counter()
     pipe.load_lora_weights(settings.lightning_lora.repo, weight_name=settings.lightning_lora.file)
     # Fused into the base weights, the LoRA costs nothing per step.
     pipe.fuse_lora()
     pipe.unload_lora_weights()
+    log.info("fused the Lightning LoRA in %.0f s", time.perf_counter() - start)
     # The runner logs progress per image; per-step bars would bury it.
     pipe.set_progress_bar_config(disable=True)
-    return pipe.to("cuda")
+    return pipe
 
 
 def _generator(seed: int) -> Any:
