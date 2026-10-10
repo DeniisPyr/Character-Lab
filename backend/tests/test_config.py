@@ -55,6 +55,7 @@ def test_recipe_path_is_relative_to_the_file_that_sets_it(tmp_path):
         ("seed: -5\n", "greater than or equal to 0"),
         ("prepare:\n  background: blur\n", "'auto', 'remove' or 'keep'"),
         ("generation:\n  transformer: fp8\n", "'bf16' or 'gguf'"),
+        ("caption:\n  task: '<OD>'\n", "'<CAPTION>', '<DETAILED_CAPTION>' or"),
         ("prepare:\n  crop_margin: 2\n", "less than or equal to 1"),
     ],
 )
