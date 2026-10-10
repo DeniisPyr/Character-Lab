@@ -20,14 +20,18 @@ class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class LoraFile(_Model):
+class HubFile(_Model):
+    """One file in a Hugging Face repo."""
+
     repo: str
     file: str
 
 
 class GenerationSettings(_Model):
     model: str
-    lightning_lora: LoraFile
+    transformer: Literal["bf16", "gguf"]
+    gguf: HubFile
+    lightning_lora: HubFile
     steps: int = Field(ge=1)
     cfg: float = Field(ge=0)
 

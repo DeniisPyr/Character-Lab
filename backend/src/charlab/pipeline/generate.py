@@ -33,8 +33,10 @@ LIGHTNING_SCHEDULER = {
     "use_karras_sigmas": False,
 }
 
-# Qwen-Image-Edit-2511 in bf16: transformer 40.9 GB, text encoder 16.6 GB, VAE 0.25 GB.
-BF16_WEIGHTS = 57.7e9
+# Weights that must fit on the GPU at once. Qwen-Image-Edit-2511 in bf16: transformer 40.9 GB,
+# text encoder 16.6 GB, VAE 0.25 GB. With gguf only one model is on the GPU at a time, and
+# the bf16 text encoder is the one no quantization setting shrinks.
+GPU_WEIGHTS = {"bf16": 57.7e9, "gguf": 16.6e9}
 # torch and torchvision must come from the same CUDA build.
 TORCH_INDEX = (
     "pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl"
@@ -44,11 +46,11 @@ TORCH_INDEX = (
 Loader = Callable[[GenerationSettings], Any]
 
 
-def check_gpu(torch: Any) -> None:
+def check_gpu(torch: Any, transformer: str) -> None:
     """Stop with a fix the user can apply if this machine cannot run the model.
 
     Runs before the weights are downloaded, so a GPU that is missing, unusable or too small
-    costs seconds, not a 58 GB download.
+    costs seconds, not a download of tens of GB.
     """
     if not torch.cuda.is_available():
         if shutil.which("nvidia-smi") is None:
@@ -67,53 +69,91 @@ def check_gpu(torch: Any) -> None:
             f"CUDA 12 driver install: {TORCH_INDEX}/cu126"
         )
     memory = torch.cuda.get_device_properties(0).total_memory
-    if memory < BF16_WEIGHTS:
+    needed = GPU_WEIGHTS[transformer]
+    if memory >= needed:
+        return
+    have = f"this GPU has {memory / 1024**3:.0f} GB"
+    if transformer == "bf16":
         raise StageUnavailable(
-            f"Qwen in bf16 needs an 80 GB GPU: its weights alone take {BF16_WEIGHTS / 1e9:.0f} "
-            f"GB, and this GPU has {memory / 1024**3:.0f} GB"
+            f"Qwen in bf16 needs an 80 GB GPU: its weights alone take {needed / 1e9:.0f} GB, "
+            f"and {have}; for a 24 GB GPU, set generation.transformer: gguf"
         )
+    raise StageUnavailable(
+        f"even with gguf, the text encoder alone takes {needed / 1e9:.0f} GB, and {have}"
+    )
 
 
 def load_pipeline(settings: GenerationSettings) -> Any:
-    """Load Qwen-Image-Edit in bf16 on the GPU, with the Lightning LoRA fused in.
+    """Load Qwen-Image-Edit with the Lightning LoRA.
 
-    Needs an 80 GB GPU. The weights (about 58 GB) are downloaded on first use to the Hugging
-    Face cache (HF_HOME, default ~/.cache/huggingface).
+    bf16: everything on the GPU, with the LoRA fused in (80 GB GPU).
+    gguf: a quantized transformer, and each model moves to the GPU only while it runs (24 GB
+    GPU). The LoRA stays a separate layer: diffusers cannot fuse it into GGUF weights.
+
+    Weights are downloaded on first use to the Hugging Face cache (HF_HOME, default
+    ~/.cache/huggingface).
     """
     try:
         import torch
-        from diffusers import FlowMatchEulerDiscreteScheduler, QwenImageEditPlusPipeline
+        from diffusers import (
+            FlowMatchEulerDiscreteScheduler,
+            GGUFQuantizationConfig,
+            QwenImageEditPlusPipeline,
+            QwenImageTransformer2DModel,
+        )
+        from huggingface_hub import hf_hub_download
     except ImportError as error:
         raise StageUnavailable(
             "generation needs torch and diffusers; install the package with the [gpu] extra"
         ) from error
-    check_gpu(torch)
+    check_gpu(torch, settings.transformer)
+    gguf = settings.transformer == "gguf"
 
-    log.info("loading %s (the first run downloads about 58 GB)", settings.model)
+    log.info("loading %s with the %s transformer", settings.model, settings.transformer)
     start = time.perf_counter()
+    # A passed transformer is not downloaded, so gguf skips the 41 GB bf16 one.
+    components = {}
+    if gguf:
+        components["transformer"] = QwenImageTransformer2DModel.from_single_file(
+            hf_hub_download(settings.gguf.repo, settings.gguf.file),
+            quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
+            # The GGUF file holds only weights; the config, with the zero_cond_t option 2511
+            # needs, comes from the model repo.
+            config=settings.model,
+            subfolder="transformer",
+            torch_dtype=torch.bfloat16,
+        )
     pipe = QwenImageEditPlusPipeline.from_pretrained(
         settings.model,
         scheduler=FlowMatchEulerDiscreteScheduler.from_config(LIGHTNING_SCHEDULER),
         torch_dtype=torch.bfloat16,
-    ).to("cuda")
-    log.info("loaded onto the GPU in %.0f s", time.perf_counter() - start)
+        **components,
+    )
+    if not gguf:
+        pipe.to("cuda")
+    log.info("loaded in %.0f s", time.perf_counter() - start)
 
-    # On the GPU, not before: PEFT fuses CPU weights in float32, which ran for over 13
+    # bf16 is on the GPU by now: PEFT fuses CPU weights in float32, which ran for over 13
     # minutes on a 20B model without finishing.
     start = time.perf_counter()
     pipe.load_lora_weights(settings.lightning_lora.repo, weight_name=settings.lightning_lora.file)
     loaded = time.perf_counter()
-    # Fused into the base weights, the LoRA costs nothing per step.
-    pipe.fuse_lora()
-    fused = time.perf_counter()
-    pipe.unload_lora_weights()
-    # Timed step by step: together they took about 160 s on an A100, more than expected.
-    log.info(
-        "Lightning LoRA: loaded in %.0f s, fused in %.0f s, unloaded in %.0f s",
-        loaded - start,
-        fused - loaded,
-        time.perf_counter() - fused,
-    )
+    if gguf:
+        # The text encoder and the transformer never sit on the GPU together.
+        pipe.enable_model_cpu_offload()
+        log.info("Lightning LoRA: loaded in %.0f s, not fused", loaded - start)
+    else:
+        # Fused into the base weights, the LoRA costs nothing per step.
+        pipe.fuse_lora()
+        fused = time.perf_counter()
+        pipe.unload_lora_weights()
+        # Timed step by step: together they took about 160 s on an A100, more than expected.
+        log.info(
+            "Lightning LoRA: loaded in %.0f s, fused in %.0f s, unloaded in %.0f s",
+            loaded - start,
+            fused - loaded,
+            time.perf_counter() - fused,
+        )
     # The runner logs progress per image; per-step bars would bury it.
     pipe.set_progress_bar_config(disable=True)
     return pipe

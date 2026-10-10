@@ -78,26 +78,28 @@ def fake_torch(available=True, memory_gb=80, cuda="13.0"):
     )
 
 
-def test_80_gb_gpu_passes_the_check():
-    check_gpu(fake_torch(memory_gb=80))
+@pytest.mark.parametrize(("memory_gb", "transformer"), [(80, "bf16"), (24, "gguf")])
+def test_big_enough_gpu_passes_the_check(memory_gb, transformer):
+    check_gpu(fake_torch(memory_gb=memory_gb), transformer)
 
 
 @pytest.mark.parametrize(
-    ("torch", "nvidia_smi", "message"),
+    ("torch", "transformer", "nvidia_smi", "message"),
     [
-        (fake_torch(memory_gb=24), True, "weights alone take 58 GB, and this GPU has 24 GB"),
-        (fake_torch(memory_gb=48), True, "needs an 80 GB GPU"),
-        (fake_torch(available=False), False, "needs an NVIDIA GPU and none was found"),
-        (fake_torch(available=False, cuda=None), True, "no CUDA support; .*whl/cu130"),
-        (fake_torch(available=False), True, "built for CUDA 13.0, .*whl/cu126"),
+        (fake_torch(memory_gb=24), "bf16", True, "take 58 GB, and this GPU has 24 GB; .* gguf"),
+        (fake_torch(memory_gb=48), "bf16", True, "needs an 80 GB GPU"),
+        (fake_torch(memory_gb=12), "gguf", True, "text encoder alone takes 17 GB, .* has 12 GB"),
+        (fake_torch(available=False), "bf16", False, "needs an NVIDIA GPU and none was found"),
+        (fake_torch(available=False, cuda=None), "bf16", True, "no CUDA support; .*whl/cu130"),
+        (fake_torch(available=False), "bf16", True, "built for CUDA 13.0, .*whl/cu126"),
     ],
-    ids=["24 GB", "48 GB", "no GPU", "CPU-only torch", "old driver"],
+    ids=["bf16 on 24 GB", "bf16 on 48 GB", "gguf on 12 GB", "no GPU", "CPU-only", "old driver"],
 )
-def test_unusable_gpu_is_reported_with_a_fix(monkeypatch, torch, nvidia_smi, message):
+def test_unusable_gpu_is_reported_with_a_fix(monkeypatch, torch, transformer, nvidia_smi, message):
     monkeypatch.setattr(generate.shutil, "which", lambda name: "/usr/bin/x" if nvidia_smi else None)
 
     with pytest.raises(StageUnavailable, match=message):
-        check_gpu(torch)
+        check_gpu(torch, transformer)
 
 
 def test_missing_gpu_packages_are_reported(monkeypatch):
