@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from charlab import __version__
 from charlab.config import load_settings
 from charlab.pipeline.jobs import Job, plan
+from charlab.pipeline.prepare import InvalidReference, load_reference
 from charlab.recipe import load_recipe
 
 TRIGGER = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -65,12 +66,11 @@ def _error(message: str) -> int:
 def _generate(args: argparse.Namespace) -> int:
     if not TRIGGER.match(args.trigger):
         return _error(f"trigger must be one word of letters, digits, _ or -, got {args.trigger!r}")
-    if not args.reference.is_file():
-        return _error(f"reference image not found: {args.reference}")
     try:
         settings = load_settings(args.config)
         recipe = load_recipe(settings.recipe)
-    except (OSError, ValidationError) as error:
+        reference = load_reference(args.reference, settings.prepare)
+    except (OSError, ValidationError, InvalidReference) as error:
         return _error(str(error))
 
     jobs = plan(recipe, settings.seed, args.description)
@@ -78,7 +78,7 @@ def _generate(args: argparse.Namespace) -> int:
     if args.dry_run:
         header = [
             f"{len(jobs)} images from recipe {recipe.name!r}, base seed {settings.seed}",
-            f"reference: {args.reference}",
+            f"reference: {args.reference} ({reference.width}x{reference.height}, checked)",
             f"trigger:   {args.trigger}",
             f"output:    {out}",
         ]

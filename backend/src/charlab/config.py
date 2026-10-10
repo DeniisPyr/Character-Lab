@@ -31,9 +31,16 @@ class GenerationSettings(_Model):
     cfg: float = Field(ge=0)
 
 
+class PrepareSettings(_Model):
+    max_file_mb: float = Field(gt=0)
+    max_pixels: int = Field(gt=0)
+    min_side: int = Field(gt=0)
+
+
 class Settings(_Model):
     seed: int = Field(ge=0)
     recipe: Path
+    prepare: PrepareSettings
     generation: GenerationSettings
 
 

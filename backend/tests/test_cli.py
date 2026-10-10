@@ -1,4 +1,5 @@
 import pytest
+from PIL import Image
 
 from charlab import __version__
 from charlab.cli import main
@@ -7,7 +8,7 @@ from charlab.cli import main
 @pytest.fixture
 def reference(tmp_path):
     path = tmp_path / "ref.png"
-    path.write_bytes(b"not checked until the prepare stage")
+    Image.new("RGB", (512, 768), "white").save(path)
     return str(path)
 
 
@@ -29,6 +30,7 @@ def test_dry_run_prints_the_plan(capsys, reference):
 
     out = capsys.readouterr().out
     assert "16 images from recipe 'lora-character', base seed 42" in out
+    assert "(512x768, checked)" in out
     assert "output:    results/mychar" in out
     assert " 1. turnaround/front" in out
     assert "16. scenes/meadow_rest" in out
@@ -69,7 +71,15 @@ def test_bad_input_is_reported(capsys, reference, extra, message):
 
 def test_missing_reference_is_reported(capsys):
     assert main(["generate", "nope.png", "--trigger", "mychar", "--dry-run"]) == 2
-    assert "reference image not found: nope.png" in capsys.readouterr().err
+    assert "nope.png: not found" in capsys.readouterr().err
+
+
+def test_invalid_reference_is_reported(capsys, tmp_path):
+    path = tmp_path / "tiny.png"
+    Image.new("RGB", (64, 64)).save(path)
+
+    assert main(["generate", str(path), "--trigger", "mychar", "--dry-run"]) == 2
+    assert "too small" in capsys.readouterr().err
 
 
 def test_invalid_config_is_reported(capsys, reference, tmp_path):

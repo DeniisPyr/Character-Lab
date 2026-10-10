@@ -9,6 +9,13 @@ seed: 42
 
 recipe: recipes/lora-character.yaml
 
+prepare:
+  # Limits for the reference image, checked before its pixels are decoded.
+  max_file_mb: 20
+  max_pixels: 25_000_000
+  # The generator encodes reference images at about 1 megapixel; much smaller ones lose detail.
+  min_side: 512
+
 generation:
   model: Qwen/Qwen-Image-Edit-2511
   lightning_lora:
