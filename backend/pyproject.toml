@@ -9,7 +9,10 @@ description = "Turn one character image into a training-ready LoRA dataset."
 license = "MIT"
 authors = [{ name = "DenisPyr" }]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pydantic>=2.10",
+    "pyyaml>=6.0",
+]
 
 [project.optional-dependencies]
 dev = [

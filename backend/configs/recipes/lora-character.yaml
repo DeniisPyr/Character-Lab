@@ -1,0 +1,156 @@
+# Dataset recipe for a character LoRA: 4 views x 4 variants = 16 images.
+#
+# Each prompt is built as:
+#   instruction + blocks (in the listed order) + setting + description (optional) + identity
+#
+# "Picture 1" is always the reference image. A variant with `references` also gets those
+# generated images as Picture 2, so they are generated first. A face reference keeps the
+# identity and art style stable outside studio shots.
+#
+# Wording tuned in two test runs with Qwen-Image-Edit-2511 (2026-10-10).
+
+name: lora-character
+
+identity: >-
+  Keep the character's face, hairstyle, body proportions, outfit and art style identical to
+  Picture 1.
+
+blocks:
+  studio: Plain white studio background, soft even lighting.
+  p2_front: >-
+    Picture 2 shows the same character's full body from the front; use it for the outfit and
+    proportions.
+  p2_back: >-
+    Picture 2 shows the character from behind; match the hair and collar to it.
+  p2_face: >-
+    Picture 2 shows the same character's face; match the face, hair colour and hair texture
+    to it.
+  scene_style: >-
+    Render the whole scene, background included, in the same art style as Picture 1.
+
+views:
+  turnaround:
+    # Separate images, not one sheet: a multi-view sheet teaches the LoRA panel layouts.
+    size: [832, 1216]
+    variants:
+      front:
+        instruction: >-
+          Show the character's full body standing upright in a relaxed neutral pose, facing
+          the camera, arms at their sides, head to feet in frame.
+        blocks: [studio]
+      three_quarter:
+        references: [turnaround/front]
+        instruction: >-
+          Show the character's full body in a three-quarter view, turned partly toward the
+          right edge of the image, standing relaxed, head to feet in frame.
+        blocks: [p2_front, studio]
+      side:
+        references: [turnaround/front]
+        instruction: >-
+          Show the character's full body in strict side profile, facing the left edge of the
+          image, standing upright, head to feet in frame.
+        blocks: [p2_front, studio]
+      back:
+        references: [turnaround/front]
+        instruction: >-
+          Show the character's full body from directly behind, standing upright, head to feet
+          in frame.
+        blocks: [p2_front, studio]
+
+  portrait:
+    size: [1024, 1024]
+    variants:
+      front:
+        instruction: >-
+          Make a head-and-shoulders portrait of the character looking straight at the camera
+          with a calm, neutral expression.
+        blocks: [studio]
+      three_quarter:
+        references: [portrait/front]
+        instruction: >-
+          Make a head-and-shoulders portrait with the head turned three-quarters toward the
+          left edge of the image, eyes on the camera.
+        blocks: [p2_face]
+        setting: Indoors beside a window, soft side daylight, the room softly blurred behind.
+      profile:
+        # With Picture 2 a test run faced the wrong way; if it still does, drop the reference.
+        references: [portrait/front]
+        instruction: >-
+          Make a head-and-shoulders portrait in strict side profile, the nose pointing toward
+          the right edge of the image.
+        blocks: [p2_face]
+        setting: Outdoors, a softly blurred green park behind, daylight.
+      over_shoulder:
+        references: [turnaround/back]
+        instruction: >-
+          Show the character from behind at head-and-shoulders distance, glancing back over
+          one shoulder toward the camera.
+        blocks: [p2_back]
+        setting: Evening, warm city lights blurred in the distance.
+
+  expressions:
+    # Each expression gets its own head angle so the four images are not near-duplicates.
+    size: [1024, 1024]
+    variants:
+      joy:
+        references: [portrait/front]
+        instruction: >-
+          Show a head-and-shoulders close-up of the character laughing with a wide, genuine
+          smile showing teeth, head tilted slightly to one side, with the neckline and
+          shoulders of the outfit visible.
+        blocks: [p2_face, studio]
+      surprise:
+        references: [portrait/front]
+        instruction: >-
+          Show a head-and-shoulders close-up of the character looking surprised, facing the
+          camera: eyebrows raised high and arched, eyes wide open, mouth open in a small round
+          shape, with the neckline and shoulders of the outfit visible.
+        blocks: [p2_face, studio]
+      anger:
+        references: [portrait/front]
+        instruction: >-
+          Show a head-and-shoulders close-up of the character looking angry, the face turned
+          three-quarters toward the right edge of the image: furrowed brows, narrowed eyes,
+          clenched jaw, with the neckline and shoulders of the outfit visible.
+        blocks: [p2_face, studio]
+      sadness:
+        references: [portrait/front]
+        instruction: >-
+          Show a head-and-shoulders close-up of the character looking sad, head lowered and
+          eyes cast down: downturned mouth, slightly raised inner eyebrows, with the neckline
+          and shoulders of the outfit visible.
+        blocks: [p2_face, studio]
+
+  scenes:
+    size: [1280, 720]
+    variants:
+      city_walk:
+        references: [portrait/front]
+        instruction: >-
+          Place the character walking along a quiet city street in daylight, natural
+          mid-stride pose, camera at eye level, medium-wide shot with the character filling
+          most of the frame height, only a few people far in the background.
+        blocks: [p2_face, scene_style]
+      hilltop_sunset:
+        references: [portrait/front]
+        instruction: >-
+          Show the character standing on a grassy hilltop at sunset, body turned slightly to
+          the side with one hand resting on the opposite arm, seen from a low camera angle,
+          strong golden backlight outlining the hair and shoulders, the character filling most
+          of the frame height.
+        blocks: [p2_face, scene_style]
+      lantern_market:
+        references: [portrait/front]
+        instruction: >-
+          Show the character sitting at a small wooden table at a night market lit by warm
+          paper lanterns, upper body in frame, sharp focus on the character, warm light on the
+          face against a dark background.
+        blocks: [p2_face, scene_style]
+      meadow_rest:
+        # Keep the head at the top: upside-down faces are hard for face detection.
+        references: [portrait/front]
+        instruction: >-
+          Show the character lying on their back in a flower meadow, seen from directly above,
+          head toward the top of the image, arms relaxed, the whole body from head to feet in
+          frame, soft midday light, natural muted colours.
+        blocks: [p2_face, scene_style]
