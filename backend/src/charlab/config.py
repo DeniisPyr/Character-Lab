@@ -5,6 +5,7 @@ merged over the defaults key by key, and validated as a whole.
 """
 
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -35,6 +36,9 @@ class PrepareSettings(_Model):
     max_file_mb: float = Field(gt=0)
     max_pixels: int = Field(gt=0)
     min_side: int = Field(gt=0)
+    background: Literal["auto", "remove", "keep"]
+    background_model: str
+    crop_margin: float = Field(ge=0, le=1)
 
 
 class Settings(_Model):

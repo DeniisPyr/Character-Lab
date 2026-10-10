@@ -17,6 +17,7 @@ def test_defaults_load():
     assert settings.seed == 42
     assert settings.generation.model == "Qwen/Qwen-Image-Edit-2511"
     assert (settings.generation.steps, settings.generation.cfg) == (4, 1.0)
+    assert settings.prepare.background_model == "birefnet-general"
 
 
 def test_default_recipe_exists_and_is_valid():
@@ -51,6 +52,8 @@ def test_recipe_path_is_relative_to_the_file_that_sets_it(tmp_path):
         ("generation:\n  steps: 0\n", "greater than or equal to 1"),
         ("generation:\n  cfg: -1\n", "greater than or equal to 0"),
         ("seed: -5\n", "greater than or equal to 0"),
+        ("prepare:\n  background: blur\n", "'auto', 'remove' or 'keep'"),
+        ("prepare:\n  crop_margin: 2\n", "less than or equal to 1"),
     ],
 )
 def test_invalid_overrides_are_rejected(tmp_path, text, message):

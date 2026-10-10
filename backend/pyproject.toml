@@ -10,12 +10,17 @@ license = "MIT"
 authors = [{ name = "DenisPyr" }]
 requires-python = ">=3.11"
 dependencies = [
+    "numpy>=2.0",
     "pillow>=11.0",
     "pydantic>=2.10",
     "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
+# Models for a real run. rembg runs on the CPU; it is fast enough for one image per run.
+gpu = [
+    "rembg[cpu]>=2.0.85",
+]
 dev = [
     "pre-commit>=4.6",
     "pytest>=9.1",

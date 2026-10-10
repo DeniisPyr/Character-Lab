@@ -15,6 +15,15 @@ prepare:
   max_pixels: 25_000_000
   # The generator encodes reference images at about 1 megapixel; much smaller ones lose detail.
   min_side: 512
+  # auto: no model when the image is transparent or its border is one plain colour, otherwise
+  # the model cuts the subject out and puts it on white. remove: use the model on plain colours
+  # too. keep: use the image as it is, without cropping.
+  background: auto
+  # rembg model. birefnet-general handles photos and drawings; isnet-anime is about 10x faster
+  # and gives smoother hair on drawn characters, but is less reliable on photos.
+  background_model: birefnet-general
+  # Space left around the subject when cropping, as a share of its longer side.
+  crop_margin: 0.05
 
 generation:
   model: Qwen/Qwen-Image-Edit-2511
