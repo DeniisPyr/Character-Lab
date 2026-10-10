@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from PIL import Image
 
@@ -31,7 +33,7 @@ def test_dry_run_prints_the_plan(capsys, reference):
     out = capsys.readouterr().out
     assert "16 images from recipe 'lora-character', base seed 42" in out
     assert "(512x768, checked)" in out
-    assert "output:    results/mychar" in out
+    assert f"output:    {Path('results', 'mychar')}" in out
     assert " 1. turnaround/front" in out
     assert "16. scenes/meadow_rest" in out
     assert "+ portrait/front" in out
