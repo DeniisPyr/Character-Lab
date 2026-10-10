@@ -102,10 +102,18 @@ def load_pipeline(settings: GenerationSettings) -> Any:
     # minutes on a 20B model without finishing.
     start = time.perf_counter()
     pipe.load_lora_weights(settings.lightning_lora.repo, weight_name=settings.lightning_lora.file)
+    loaded = time.perf_counter()
     # Fused into the base weights, the LoRA costs nothing per step.
     pipe.fuse_lora()
+    fused = time.perf_counter()
     pipe.unload_lora_weights()
-    log.info("fused the Lightning LoRA in %.0f s", time.perf_counter() - start)
+    # Timed step by step: together they took about 160 s on an A100, more than expected.
+    log.info(
+        "Lightning LoRA: loaded in %.0f s, fused in %.0f s, unloaded in %.0f s",
+        loaded - start,
+        fused - loaded,
+        time.perf_counter() - fused,
+    )
     # The runner logs progress per image; per-step bars would bury it.
     pipe.set_progress_bar_config(disable=True)
     return pipe
