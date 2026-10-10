@@ -23,6 +23,8 @@ gpu = [
     # 0.37 adds the zero_cond_t option that Qwen-Image-Edit-2511 needs; older versions ignore it
     # with only a warning and the images come out wrong.
     "diffusers>=0.37",
+    # For the gguf transformer setting; diffusers needs 0.10 or newer.
+    "gguf>=0.10",
     "peft>=0.17",
     "rembg[cpu]>=2.0.85",
     "torch>=2.6",

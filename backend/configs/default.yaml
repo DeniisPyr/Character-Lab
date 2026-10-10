@@ -27,6 +27,16 @@ prepare:
 
 generation:
   model: Qwen/Qwen-Image-Edit-2511
+  # bf16: the full transformer, all on the GPU. Needs an 80 GB GPU (about 62 GB measured on
+  # an A100); the first run downloads about 58 GB.
+  # gguf: a quantized transformer, and each model moves to the GPU only while it runs, for
+  # 24 GB GPUs; the first run downloads about 34 GB.
+  transformer: bf16
+  gguf:
+    repo: unsloth/Qwen-Image-Edit-2511-GGUF
+    # Q6_K (16.9 GB) is the closest to bf16 that should fit 24 GB; Q5_K_M (15.0 GB) and
+    # Q4_K_M (13.2 GB) leave more room.
+    file: qwen-image-edit-2511-Q6_K.gguf
   lightning_lora:
     repo: lightx2v/Qwen-Image-Edit-2511-Lightning
     file: Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors
