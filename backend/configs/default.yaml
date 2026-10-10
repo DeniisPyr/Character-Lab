@@ -1,8 +1,8 @@
 # Pipeline settings. A user config only needs the values it changes; it is merged over these
 # defaults key by key. Relative paths are resolved from the file that sets them.
 #
-# Settings for later stages (captions, quality gate, quantization) are added with the stage
-# that uses them, with measured values, not placeholders.
+# Settings for later stages (face refinement, quality gate) are added with the stage that uses
+# them, with measured values, not placeholders.
 
 # Base seed. The same seed and settings reproduce the same images.
 seed: 42
@@ -43,3 +43,13 @@ generation:
   # The Lightning LoRA is distilled for 4 steps without classifier-free guidance (CFG 1).
   steps: 4
   cfg: 1.0
+
+caption:
+  # Florence-2 large in transformers' own format, so no remote code runs. 1.55 GB; fast
+  # enough on a CPU or a Mac too.
+  model: florence-community/Florence-2-large
+  # On generated images, the paragraph task got outfit, pose, view and background right far
+  # more often; <DETAILED_CAPTION> invented details (a hair bun, black heels).
+  task: "<MORE_DETAILED_CAPTION>"
+  num_beams: 3
+  max_new_tokens: 512

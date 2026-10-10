@@ -36,6 +36,13 @@ class GenerationSettings(_Model):
     cfg: float = Field(ge=0)
 
 
+class CaptionSettings(_Model):
+    model: str
+    task: Literal["<CAPTION>", "<DETAILED_CAPTION>", "<MORE_DETAILED_CAPTION>"]
+    num_beams: int = Field(ge=1)
+    max_new_tokens: int = Field(ge=1)
+
+
 class PrepareSettings(_Model):
     max_file_mb: float = Field(gt=0)
     max_pixels: int = Field(gt=0)
@@ -50,6 +57,7 @@ class Settings(_Model):
     recipe: Path
     prepare: PrepareSettings
     generation: GenerationSettings
+    caption: CaptionSettings
 
 
 def merge(base: dict, override: dict) -> dict:
