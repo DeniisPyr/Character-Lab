@@ -147,10 +147,14 @@ views:
           face against a dark background.
         blocks: [p2_face, scene_style]
       meadow_rest:
-        # Keep the head at the top: upside-down faces are hard for face detection.
+        # Head up, body across the frame. Lying on the back seen from above, a full body does
+        # not fit 16:9 head to feet, and the model turned the face upside down even when told
+        # "head toward the top" (ComfyUI and the first pipeline run). Upside-down and sideways
+        # faces are hard for face detection.
         references: [portrait/front]
         instruction: >-
-          Show the character lying on their back in a flower meadow, seen from directly above,
-          head toward the top of the image, arms relaxed, the whole body from head to feet in
-          frame, soft midday light, natural muted colours.
+          Show the character lying on their side in a flower meadow, propped up on one elbow
+          with the head raised and the face toward the camera, the body stretched across the
+          frame from left to right, the whole body from head to feet in frame, camera at
+          ground level, soft midday light, natural muted colours.
         blocks: [p2_face, scene_style]
