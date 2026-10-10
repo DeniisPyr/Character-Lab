@@ -2,6 +2,7 @@
 
 import logging
 import math
+import shutil
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -31,15 +32,49 @@ LIGHTNING_SCHEDULER = {
     "use_karras_sigmas": False,
 }
 
+# Qwen-Image-Edit-2511 in bf16: transformer 40.9 GB, text encoder 16.6 GB, VAE 0.25 GB.
+BF16_WEIGHTS = 57.7e9
+TORCH_INDEX = "pip install --force-reinstall torch --index-url https://download.pytorch.org/whl"
+
 # Takes the settings and returns a loaded pipeline. Tests pass a fake.
 Loader = Callable[[GenerationSettings], Any]
+
+
+def check_gpu(torch: Any) -> None:
+    """Stop with a fix the user can apply if this machine cannot run the model.
+
+    Runs before the weights are downloaded, so a GPU that is missing, unusable or too small
+    costs seconds, not a 58 GB download.
+    """
+    if not torch.cuda.is_available():
+        if shutil.which("nvidia-smi") is None:
+            raise StageUnavailable(
+                "generation needs an NVIDIA GPU and none was found; "
+                "--dry-run shows the plan without one"
+            )
+        if torch.version.cuda is None:
+            raise StageUnavailable(
+                f"this torch build has no CUDA support; install one with: {TORCH_INDEX}/cu130 "
+                "(use cu126 if nvidia-smi shows a CUDA version below 13)"
+            )
+        raise StageUnavailable(
+            f"torch is built for CUDA {torch.version.cuda}, which the NVIDIA driver does not "
+            "support (nvidia-smi shows the newest CUDA it does); update the driver, or for a "
+            f"CUDA 12 driver install: {TORCH_INDEX}/cu126"
+        )
+    memory = torch.cuda.get_device_properties(0).total_memory
+    if memory < BF16_WEIGHTS:
+        raise StageUnavailable(
+            f"Qwen in bf16 needs an 80 GB GPU: its weights alone take {BF16_WEIGHTS / 1e9:.0f} "
+            f"GB, and this GPU has {memory / 1024**3:.0f} GB"
+        )
 
 
 def load_pipeline(settings: GenerationSettings) -> Any:
     """Load Qwen-Image-Edit in bf16 on the GPU, with the Lightning LoRA fused in.
 
-    Needs about 62-68 GB of GPU memory. The weights (about 58 GB) are downloaded on first use
-    to the Hugging Face cache (HF_HOME, default ~/.cache/huggingface).
+    Needs an 80 GB GPU. The weights (about 58 GB) are downloaded on first use to the Hugging
+    Face cache (HF_HOME, default ~/.cache/huggingface).
     """
     try:
         import torch
@@ -48,8 +83,7 @@ def load_pipeline(settings: GenerationSettings) -> Any:
         raise StageUnavailable(
             "generation needs torch and diffusers; install the package with the [gpu] extra"
         ) from error
-    if not torch.cuda.is_available():
-        raise StageUnavailable("generation needs an NVIDIA GPU with CUDA")
+    check_gpu(torch)
 
     log.info("loading %s (the first run downloads about 58 GB)", settings.model)
     pipe = QwenImageEditPlusPipeline.from_pretrained(

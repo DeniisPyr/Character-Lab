@@ -6,7 +6,7 @@ from PIL import Image
 
 from charlab.config import load_settings
 from charlab.pipeline import generate
-from charlab.pipeline.generate import QwenGenerator, load_pipeline
+from charlab.pipeline.generate import QwenGenerator, check_gpu, load_pipeline
 from charlab.pipeline.stages import StageUnavailable
 
 SETTINGS = load_settings().generation
@@ -68,6 +68,36 @@ def test_guidance_above_1_sends_a_negative_prompt(pipe):
     make(pipe, settings)[0]("A.", [Image.new("RGB", (64, 64))], (1024, 1024), 1)
 
     assert pipe.calls[0]["negative_prompt"] == " "
+
+
+def fake_torch(available=True, memory_gb=80, cuda="13.0"):
+    props = SimpleNamespace(total_memory=memory_gb * 1024**3)
+    return SimpleNamespace(
+        cuda=SimpleNamespace(is_available=lambda: available, get_device_properties=lambda i: props),
+        version=SimpleNamespace(cuda=cuda),
+    )
+
+
+def test_80_gb_gpu_passes_the_check():
+    check_gpu(fake_torch(memory_gb=80))
+
+
+@pytest.mark.parametrize(
+    ("torch", "nvidia_smi", "message"),
+    [
+        (fake_torch(memory_gb=24), True, "weights alone take 58 GB, and this GPU has 24 GB"),
+        (fake_torch(memory_gb=48), True, "needs an 80 GB GPU"),
+        (fake_torch(available=False), False, "needs an NVIDIA GPU and none was found"),
+        (fake_torch(available=False, cuda=None), True, "no CUDA support; .*whl/cu130"),
+        (fake_torch(available=False), True, "built for CUDA 13.0, .*whl/cu126"),
+    ],
+    ids=["24 GB", "48 GB", "no GPU", "CPU-only torch", "old driver"],
+)
+def test_unusable_gpu_is_reported_with_a_fix(monkeypatch, torch, nvidia_smi, message):
+    monkeypatch.setattr(generate.shutil, "which", lambda name: "/usr/bin/x" if nvidia_smi else None)
+
+    with pytest.raises(StageUnavailable, match=message):
+        check_gpu(torch)
 
 
 def test_missing_gpu_packages_are_reported(monkeypatch):
