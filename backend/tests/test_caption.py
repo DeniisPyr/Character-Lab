@@ -1,14 +1,99 @@
+import json
+import re
 import sys
+from pathlib import Path
 
 import pytest
 from PIL import Image
 
 from charlab.config import load_settings
-from charlab.pipeline.caption import Florence, FlorenceCaptioner, load_florence
+from charlab.pipeline.caption import (
+    Florence,
+    FlorenceCaptioner,
+    build_caption,
+    clean_description,
+    load_florence,
+)
 from charlab.pipeline.stages import StageUnavailable
 
 SETTINGS = load_settings().caption
 TASK = "<MORE_DETAILED_CAPTION>"
+# Florence-2-large's real descriptions of the 16 images from a GPU run (2026-10-10).
+DESCRIPTIONS = json.loads(
+    (Path(__file__).parent / "fixtures" / "florence_descriptions.json").read_text("utf-8")
+)
+FIXED_LOOK_OR_FILLER = re.compile(
+    r"\bhair\b|\bappears to be in\b|\bher body\b|\bmakeup\b|\boverall mood\b|\bfocal point\b"
+    r"|\brendering\b",
+    re.IGNORECASE,
+)
+
+
+@pytest.mark.parametrize("name", sorted(DESCRIPTIONS))
+def test_real_descriptions_lose_the_fixed_look_and_filler(name):
+    cleaned = clean_description(DESCRIPTIONS[name])
+
+    assert cleaned
+    assert not FIXED_LOOK_OR_FILLER.search(cleaned)
+
+
+def test_outfit_pose_and_background_are_kept():
+    cleaned = clean_description(DESCRIPTIONS["turnaround_back"])
+
+    assert cleaned == (
+        "The image shows a young woman standing with her back towards the camera. She is "
+        "wearing a beige off-the-shoulder dress with long sleeves and a round neckline. The "
+        "dress is made of a soft, loose-fitting fabric and has a relaxed fit. She has bare "
+        "feet and is standing on a white background."
+    )
+
+
+@pytest.mark.parametrize(
+    ("sentence", "kept"),
+    [
+        (
+            "The image is a close-up portrait of a young woman with long, wavy hair.",
+            "The image is a close-up portrait of a young woman.",
+        ),
+        (
+            "She is wearing a white dress and has long dark hair that is styled in loose waves.",
+            "She is wearing a white dress.",
+        ),
+        ("Her hair is styled in loose waves.", ""),
+        # A cut here once left "The woman and falls over her shoulders."
+        ("The woman has long, wavy hair that is styled in loose waves and falls down.", ""),
+        ("She has bright green eyes.", ""),
+        ("She has fair skin and freckles.", ""),
+        ("Her eyes are closed in a smile.", "Her eyes are closed in a smile."),
+    ],
+)
+def test_hair_clauses_are_cut_and_fixed_traits_dropped(sentence, kept):
+    assert clean_description(sentence) == kept
+
+
+def test_caption_is_trigger_tags_then_cleaned_description():
+    caption = build_caption(
+        "mychar",
+        "full body, back view, standing, plain white background",
+        "She is standing with her back towards the camera. Her hair is long.",
+    )
+
+    assert caption == (
+        "mychar, full body, back view, standing, plain white background. "
+        "She is standing with her back towards the camera."
+    )
+
+
+@pytest.mark.parametrize(
+    ("tags", "description", "caption"),
+    [
+        ("", "She is walking.", "mychar. She is walking."),
+        ("full body.", None, "mychar, full body."),
+        ("full body", "Her hair is long.", "mychar, full body."),
+    ],
+)
+def test_caption_parts_can_be_missing(tags, description, caption):
+    assert build_caption("mychar", tags, description) == caption
 
 
 class FakeInputs(dict):

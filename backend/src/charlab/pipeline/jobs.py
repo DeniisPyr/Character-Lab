@@ -14,6 +14,7 @@ class Job:
     size: tuple[int, int]  # (width, height)
     seed: int
     references: tuple[str, ...]  # keys of earlier jobs passed as Picture 2, 3
+    caption: str = ""  # the recipe's caption tags
 
     @property
     def view(self) -> str:
@@ -28,7 +29,7 @@ class Job:
 class Result:
     job: Job
     image: Image.Image
-    caption: str | None
+    description: str | None  # from the caption stage, before the caption is built
 
 
 def plan(recipe: Recipe, seed: int, description: str | None = None) -> list[Job]:
@@ -42,6 +43,7 @@ def plan(recipe: Recipe, seed: int, description: str | None = None) -> list[Job]
             size=recipe.size(key),
             seed=seed + position[key],
             references=recipe.variant(key).references,
+            caption=recipe.variant(key).caption,
         )
         for key in recipe.generation_order()
     ]
