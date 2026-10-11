@@ -34,6 +34,8 @@ class Variant(_Model):
     references: tuple[str, ...] = ()
     # Tags for the training caption, written after the trigger word.
     caption: str = ""
+    # Whether the shot shows the face; the quality gate then expects to find one.
+    face: bool = True
 
     @field_validator("references")
     @classmethod

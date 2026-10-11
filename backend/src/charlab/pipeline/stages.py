@@ -7,9 +7,12 @@ model. Tests pass fakes with the same signatures, which keeps CI free of GPUs an
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from PIL import Image
+
+if TYPE_CHECKING:
+    from charlab.pipeline.jobs import Check, Job
 
 
 class StageUnavailable(RuntimeError):
@@ -28,6 +31,14 @@ class Generate(Protocol):
         """Edit `images` (Picture 1, 2, ...) into a new image of `size` (width, height)."""
 
 
+class Gate(Protocol):
+    def start(self, reference: Image.Image) -> None:
+        """Score the prepared reference, once per run."""
+
+    def __call__(self, job: "Job", image: Image.Image) -> "Check":
+        """Score one generated image against the reference."""
+
+
 class Caption(Protocol):
     def __call__(self, image: Image.Image) -> str:
         """Describe the image for the training caption."""
@@ -39,3 +50,5 @@ class Stages:
     generate: Generate
     # Without a caption stage, the results have no captions.
     caption: Caption | None = None
+    # Without a quality gate, every image is kept as generated.
+    check: Gate | None = None

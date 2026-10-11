@@ -53,7 +53,7 @@ class Export:
                     "view": job.view,
                     "variant": job.variant,
                     "size": list(job.size),
-                    "seed": job.seed,
+                    "seed": result.seed,
                     "prompt": job.prompt,
                     "caption": caption,
                 }

@@ -7,6 +7,7 @@ from PIL import Image
 
 from charlab import __version__, cli
 from charlab.cli import main
+from charlab.pipeline.jobs import Check
 from charlab.pipeline.stages import StageUnavailable
 
 
@@ -52,10 +53,31 @@ class FakeCaptioner:
         return "A woman stands in a studio. Her hair is long and wavy."
 
 
+class FakeGate:
+    """Passes every image, except the first attempt of turnaround/front when told to."""
+
+    fail_first_front = False
+
+    def __init__(self, settings):
+        self.seen = set()
+
+    def start(self, reference):
+        pass
+
+    def __call__(self, job, image):
+        first_try = job.key not in self.seen
+        self.seen.add(job.key)
+        if self.fail_first_front and job.key == "turnaround/front" and first_try:
+            return Check(0.5, failures=("CCIP difference 0.500: not the same character",))
+        return Check(0.01)
+
+
 @pytest.fixture
 def fake_models(monkeypatch):
     monkeypatch.setattr(cli, "QwenGenerator", FakeGenerator)
     monkeypatch.setattr(cli, "FlorenceCaptioner", FakeCaptioner)
+    monkeypatch.setattr(cli, "QualityGate", FakeGate)
+    monkeypatch.setattr(FakeGate, "fail_first_front", False)
 
 
 def test_version_flag_prints_version(capsys):
@@ -83,6 +105,7 @@ def test_dry_run_prints_the_plan(capsys, reference):
     assert "+ portrait/front" in out
     assert "Show the character's full body standing upright" in out
     assert "caption: mychar, full body, front view, standing, plain white background." in out
+    assert "quality:   anime checks, up to 3 attempts per image" in out
 
 
 def test_dry_run_uses_description_out_and_config(capsys, reference, tmp_path):
@@ -154,7 +177,19 @@ def test_real_run_writes_the_captioned_dataset(capsys, fake_models, reference, t
     assert (manifest["trigger"], manifest["reference"]) == ("mychar", "ref.png")
     assert manifest["generation"]["transformer"] == "bf16"
     assert len(manifest["images"]) == 16
-    assert f"saved 16 images with captions to {out}" in capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert f"saved 16 images with captions to {out}" in printed
+    assert "quality: 16/16 images passed every check" in printed
+
+
+def test_a_failed_image_is_regenerated_with_a_new_seed(fake_models, reference, tmp_path):
+    FakeGate.fail_first_front = True
+    out = tmp_path / "out"
+
+    assert main(["generate", reference, "--trigger", "mychar", "--out", str(out)]) == 0
+
+    manifest = json.loads((out / "manifest.json").read_text("utf-8"))
+    assert [image["seed"] for image in manifest["images"][:2]] == [42 + 1000, 43]
 
 
 def test_zip_option_packs_the_dataset(capsys, fake_models, reference, tmp_path):

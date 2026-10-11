@@ -18,6 +18,7 @@ from charlab.pipeline.export import Export
 from charlab.pipeline.generate import QwenGenerator
 from charlab.pipeline.jobs import Job, plan
 from charlab.pipeline.prepare import InvalidReference, load_reference, prepare_reference
+from charlab.pipeline.quality import QualityGate
 from charlab.pipeline.runner import run
 from charlab.pipeline.stages import Stages, StageUnavailable
 from charlab.recipe import Recipe, load_recipe
@@ -109,6 +110,8 @@ def _generate(args: argparse.Namespace) -> int:
             f"reference: {args.reference} ({reference.width}x{reference.height}, checked)",
             f"trigger:   {args.trigger}",
             f"output:    {out}",
+            f"quality:   {settings.style} checks, up to {settings.quality.max_attempts} "
+            "attempts per image",
         ]
         print(format_plan(jobs, header, args.trigger))
         return 0
@@ -119,6 +122,7 @@ def _generate(args: argparse.Namespace) -> int:
         prepare=partial(prepare_reference, settings=settings.prepare),
         generate=generator,
         caption=FlorenceCaptioner(settings.caption),
+        check=QualityGate(settings.quality),
     )
     export = Export(out, jobs)
     try:
@@ -129,12 +133,17 @@ def _generate(args: argparse.Namespace) -> int:
             on_image=export.save_image,
             # Frees the GPU before the caption model loads.
             after_generate=generator.unload,
+            max_attempts=settings.quality.max_attempts,
         )
     except (InvalidReference, StageUnavailable) as error:
         return _error(str(error))
 
     export.write_captions(results, args.trigger, _run_record(args, settings, recipe))
     print(f"saved {len(results)} images with captions to {out}")
+    failed = [r.job.key for r in results if r.attempts[r.kept].check.failures]
+    print(f"quality: {len(results) - len(failed)}/{len(results)} images passed every check")
+    if failed:
+        print(f"failed all attempts (kept the best): {', '.join(failed)}")
     if args.zip:
         print(f"packed the dataset into {export.zip()}")
     return 0
