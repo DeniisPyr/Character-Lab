@@ -166,6 +166,15 @@ def _generator(seed: int) -> Any:
     return torch.Generator("cpu").manual_seed(seed)
 
 
+def _free_gpu_memory() -> None:
+    import gc
+
+    import torch
+
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
 class QwenGenerator:
     """The generate stage.
 
@@ -196,3 +205,9 @@ class QwenGenerator:
             num_inference_steps=self.settings.steps,
             generator=_generator(seed),
         ).images[0]
+
+    def unload(self) -> None:
+        """Free the GPU memory, so the next stage's model fits. A later call loads again."""
+        if self._pipe is not None:
+            self._pipe = None
+            _free_gpu_memory()

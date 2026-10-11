@@ -47,6 +47,23 @@ def test_pipeline_loads_once_on_the_first_call(pipe):
     assert loads == [SETTINGS]
 
 
+def test_unload_frees_the_gpu_and_a_later_call_loads_again(pipe, monkeypatch):
+    freed = []
+    monkeypatch.setattr(generate, "_free_gpu_memory", lambda: freed.append(True))
+    generator, loads = make(pipe)
+
+    generator.unload()
+    assert freed == []
+
+    generator("A.", [Image.new("RGB", (64, 64))], (832, 1216), 1)
+    generator.unload()
+    generator.unload()
+    assert freed == [True]
+
+    generator("B.", [Image.new("RGB", (64, 64))], (832, 1216), 2)
+    assert len(loads) == 2
+
+
 def test_call_passes_images_size_steps_and_seed(pipe):
     images = [Image.new("RGB", (64, 64)), Image.new("RGB", (32, 32))]
 

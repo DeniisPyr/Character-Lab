@@ -74,6 +74,26 @@ def test_captioning_starts_after_all_images_are_generated():
     assert kinds == ["prepare"] + ["generate"] * 16 + ["caption"] * 16
 
 
+def test_each_image_is_handed_over_at_once_and_the_gpu_freed_before_captions():
+    fake = FakeStages()
+
+    run(
+        REFERENCE,
+        shipped_jobs(),
+        fake.stages(),
+        on_image=lambda job, image: fake.calls.append(("saved", job.key, image)),
+        after_generate=lambda: fake.calls.append(("after_generate",)),
+    )
+
+    kinds = [call[0] for call in fake.calls]
+    assert kinds == (
+        ["prepare"] + ["generate", "saved"] * 16 + ["after_generate"] + ["caption"] * 16
+    )
+    generated = [call[3] for call in fake.calls if call[0] == "generate"]
+    saved = [call[2] for call in fake.calls if call[0] == "saved"]
+    assert all(a is b for a, b in zip(generated, saved, strict=True))
+
+
 def test_without_a_caption_stage_results_have_no_descriptions():
     fake = FakeStages()
 

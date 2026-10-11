@@ -1,8 +1,10 @@
 """Runs the stages over a plan of jobs."""
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+
+from PIL import Image
 
 from charlab.pipeline.jobs import Job, Result
 from charlab.pipeline.stages import Stages
@@ -10,13 +12,23 @@ from charlab.pipeline.stages import Stages
 log = logging.getLogger(__name__)
 
 
-def run(reference: Path, jobs: Sequence[Job], stages: Stages) -> list[Result]:
+def run(
+    reference: Path,
+    jobs: Sequence[Job],
+    stages: Stages,
+    on_image: Callable[[Job, Image.Image], None] | None = None,
+    after_generate: Callable[[], None] | None = None,
+) -> list[Result]:
     """Prepare the reference once, generate every job in order, then caption all images
     (if there is a caption stage).
 
     Picture 1 is always the prepared reference; a job's references follow as Picture 2, 3.
     Captioning starts only after the last image is generated, so only one model needs to be
     in GPU memory at a time.
+
+    `on_image` gets each image as soon as it is generated, so the images already made
+    survive a later crash. `after_generate` runs between generating and captioning, to
+    free the GPU for the caption model.
     """
     picture_1 = stages.prepare(reference)
 
@@ -31,6 +43,10 @@ def run(reference: Path, jobs: Sequence[Job], stages: Stages) -> list[Result]:
             raise ValueError(f"{job.key}: generator returned {image.size}, expected {job.size}")
         images[job.key] = image
         log.info("generated %s (%d/%d)", job.key, number, len(jobs))
+        if on_image:
+            on_image(job, image)
+    if after_generate:
+        after_generate()
 
     if stages.caption is None:
         return [Result(job, images[job.key], None) for job in jobs]
