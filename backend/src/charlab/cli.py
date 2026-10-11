@@ -86,6 +86,7 @@ def _run_record(args: argparse.Namespace, settings: Settings, recipe: Recipe) ->
         "style": settings.style,
         "generation": settings.generation.model_dump(),
         "quality": settings.quality.model_dump(),
+        "face_repair": settings.face_repair.model_dump(),
         "captioning": settings.caption.model_dump(),
     }
 

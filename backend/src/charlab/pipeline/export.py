@@ -3,7 +3,8 @@
     001_turnaround_front.png   the image
     001_turnaround_front.txt   its training caption
     manifest.json              the run's settings, then every image with its seed and prompt
-    report.json                the quality gate's scores for every attempt at every image
+    report.json                the quality gate's scores for every attempt at every image, and
+                               every face repair
 
 The number keeps files in generation order. LoRA trainers pair each image with the .txt of
 the same name.
@@ -19,7 +20,7 @@ from PIL import Image
 
 from charlab.config import QualitySettings
 from charlab.pipeline.caption import build_caption
-from charlab.pipeline.jobs import Attempt, Job, Result
+from charlab.pipeline.jobs import Attempt, Check, Job, Repair, Result
 from charlab.pipeline.quality import duplicates
 
 
@@ -67,7 +68,8 @@ class Export:
         return manifest
 
     def write_report(self, results: Sequence[Result], limits: QualitySettings) -> Path:
-        """Write the quality gate's scores for every attempt, plus near-duplicate pairs."""
+        """Write the quality gate's scores for every attempt, each face repair, and the
+        near-duplicate pairs."""
         self.out.mkdir(parents=True, exist_ok=True)
         images = [
             {
@@ -75,6 +77,7 @@ class Export:
                 "passed": None if result.check is None else result.check.passed,
                 "kept_attempt": result.kept + 1,
                 "attempts": [_attempt(attempt) for attempt in result.attempts],
+                "repair": None if result.repair is None else _repair(result.repair),
             }
             for result in results
         ]
@@ -87,6 +90,10 @@ class Export:
                 "passed": sum(image["passed"] is not False for image in images),
                 "retried": [i["image"] for i in images if len(i["attempts"]) > 1],
                 "failed": [i["image"] for i in images if i["passed"] is False],
+                "repaired": [i["image"] for i in images if i["repair"] and i["repair"]["kept"]],
+                "repairs_rejected": [
+                    i["image"] for i in images if i["repair"] and not i["repair"]["kept"]
+                ],
                 "near_duplicates": len(pairs),
             },
             "limits": limits.model_dump(include=_LIMITS),
@@ -112,12 +119,23 @@ _LIMITS = {
 
 
 def _attempt(attempt: Attempt) -> dict[str, Any]:
-    check = attempt.check
-    if check is None:
+    if attempt.check is None:
         return {"seed": attempt.seed, "passed": None}
+    return {"seed": attempt.seed, **_check(attempt.check)}
+
+
+def _repair(repair: Repair) -> dict[str, Any]:
+    return {
+        "seed": repair.seed,
+        "kept": repair.kept,
+        "reason": repair.reason,
+        **_check(repair.check),
+    }
+
+
+def _check(check: Check) -> dict[str, Any]:
     face = check.face
     return {
-        "seed": attempt.seed,
         "passed": check.passed,
         "identity": round(check.identity, 4),
         "face": None
