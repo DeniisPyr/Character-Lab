@@ -64,6 +64,8 @@ views:
           Show the character's full body from directly behind, standing upright, head to feet
           in frame.
         blocks: [p2_front, studio]
+        # Seen from behind: the quality gate checks identity here, but no face.
+        face: false
         caption: full body, back view, standing, plain white background
 
   portrait:

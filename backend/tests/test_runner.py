@@ -4,8 +4,8 @@ import pytest
 from PIL import Image
 
 from charlab.config import load_settings
-from charlab.pipeline.jobs import Job, plan
-from charlab.pipeline.runner import run
+from charlab.pipeline.jobs import Check, Job, plan
+from charlab.pipeline.runner import RETRY_SEED_STEP, run
 from charlab.pipeline.stages import Stages
 from charlab.recipe import load_recipe
 
@@ -115,3 +115,79 @@ def test_generator_must_return_the_requested_size():
 
     with pytest.raises(ValueError, match=r"returned \(65, 64\), expected \(64, 64\)"):
         run(REFERENCE, jobs, FakeStages(wrong_size=True).stages())
+
+
+class FakeGate:
+    """Fails the attempts whose seed is listed, with the identity given per seed."""
+
+    def __init__(self, failing=(), identity=None):
+        self.failing, self.identity = set(failing), identity or {}
+        self.reference, self.checked = None, []
+
+    def start(self, reference):
+        self.reference = reference
+
+    def __call__(self, job, image):
+        seed = image.getpixel((0, 0))[0]  # the fake generator paints seed % 256 into red
+        self.checked.append((job.key, seed))
+        failures = ("too different",) if seed in self.failing else ()
+        return Check(self.identity.get(seed, 0.01), failures=failures)
+
+
+TWO_JOBS = [
+    Job("view/a", "A.", (64, 64), 10, ()),
+    Job("view/b", "B.", (64, 64), 11, ("view/a",)),
+]
+RETRY = 10 + RETRY_SEED_STEP  # job a's first retry seed; 1010 % 256 == 242
+
+
+def gated(fake, gate):
+    return Stages(fake.prepare, fake.generate, fake.caption, check=gate)
+
+
+def test_the_gate_scores_the_prepared_reference_first():
+    fake, gate = FakeStages(), FakeGate()
+
+    run(REFERENCE, TWO_JOBS, gated(fake, gate), max_attempts=3)
+
+    assert gate.reference is fake.picture_1
+    assert gate.checked == [("view/a", 10), ("view/b", 11)]
+
+
+def test_a_failed_image_is_made_again_and_later_jobs_get_the_kept_one():
+    fake, gate, saved = FakeStages(), FakeGate(failing={10}), []
+
+    results = run(
+        REFERENCE,
+        TWO_JOBS,
+        gated(fake, gate),
+        on_image=lambda job, image: saved.append((job.key, image.getpixel((0, 0))[0])),
+        max_attempts=3,
+    )
+
+    first = results[0]
+    assert [attempt.seed for attempt in first.attempts] == [10, RETRY]
+    assert (first.kept, first.seed) == (1, RETRY)
+    assert saved == [("view/a", RETRY % 256), ("view/b", 11)]
+    last_inputs = [call[2] for call in fake.calls if call[0] == "generate"][-1]
+    assert last_inputs[1] is first.image
+
+
+def test_when_every_attempt_fails_the_best_one_is_kept():
+    seeds = [10, 10 + RETRY_SEED_STEP, 10 + 2 * RETRY_SEED_STEP]
+    identity = {10: 0.5, 1010 % 256: 0.2, 2010 % 256: 0.3}
+    gate = FakeGate(failing={s % 256 for s in seeds}, identity=identity)
+
+    results = run(REFERENCE, TWO_JOBS[:1], gated(FakeStages(), gate), max_attempts=3)
+
+    assert [attempt.seed for attempt in results[0].attempts] == seeds
+    assert results[0].seed == seeds[1]
+
+
+def test_without_a_gate_each_image_is_made_once():
+    fake = FakeStages()
+
+    results = run(REFERENCE, TWO_JOBS, fake.stages(), max_attempts=3)
+
+    assert [len(result.attempts) for result in results] == [1, 1]
+    assert results[0].attempts[0].check is None

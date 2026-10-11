@@ -23,6 +23,7 @@ def test_every_shipped_job_carries_its_caption_tags():
 
     assert all(job.caption for job in jobs.values())
     assert jobs["turnaround/back"].caption.startswith("full body, back view")
+    assert [key for key, job in jobs.items() if not job.face] == ["turnaround/back"]
 
 
 def test_shipped_plan_seeds_are_distinct_and_reproducible():

@@ -65,6 +65,19 @@ quality:
     repo: deepghs/ccip_onnx
     file: ccip-caformer-24-randaug-pruned/model_metrics.onnx
 
+  # The gate checks each image as soon as it is made; a failed image is made again with a new
+  # seed, up to this many tries in all. If none passes, the best one is kept and reported.
+  max_attempts: 3
+  # Limits, set from 16 generated images of one character (2026-10):
+  # - CCIP difference below this counts as the same character (CCIP's F1-optimal value).
+  #   Ours scored 0.008-0.063; 12 other anime characters scored 0.32-0.48.
+  same_character_below: 0.1785
+  # - The face's shorter side, in pixels. Ours: 79 (side view) to 423.
+  min_face_px: 64
+  # - Face sharpness as a share of the reference face's (variance of the Laplacian). Ours:
+  #   0.14x and up; small or dark faces score low. A blurred copy scored 0.02x.
+  min_sharpness: 0.07
+
 caption:
   # Florence-2 large in transformers' own format, so no remote code runs. 1.55 GB; fast
   # enough on a CPU or a Mac too.

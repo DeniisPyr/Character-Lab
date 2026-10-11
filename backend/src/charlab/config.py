@@ -41,6 +41,10 @@ class QualitySettings(_Model):
     face_confidence: float = Field(gt=0, lt=1)
     ccip_features: HubFile
     ccip_metric: HubFile
+    max_attempts: int = Field(ge=1)
+    same_character_below: float = Field(gt=0)
+    min_face_px: int = Field(ge=1)
+    min_sharpness: float = Field(ge=0)
 
 
 class CaptionSettings(_Model):
