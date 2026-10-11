@@ -4,7 +4,7 @@ import pytest
 from PIL import Image
 
 from charlab.config import load_settings
-from charlab.pipeline.jobs import Check, Job, plan
+from charlab.pipeline.jobs import Check, Job, Repair, plan
 from charlab.pipeline.runner import RETRY_SEED_STEP, run
 from charlab.pipeline.stages import Stages
 from charlab.recipe import load_recipe
@@ -191,3 +191,52 @@ def test_without_a_gate_each_image_is_made_once():
 
     assert [len(result.attempts) for result in results] == [1, 1]
     assert results[0].attempts[0].check is None
+
+
+class FakeRepair:
+    """Repairs view/a: paints it blue, kept or not as told."""
+
+    def __init__(self, keep=True):
+        self.keep, self.reference, self.calls = keep, None, []
+
+    def start(self, reference):
+        self.reference = reference
+
+    def __call__(self, job, image, check, seed):
+        self.calls.append((job.key, seed))
+        if job.key != "view/a":
+            return None
+        repaired = Image.new("RGB", image.size, "blue")
+        repair = Repair(seed + 500, Check(0.005), self.keep, "kept" if self.keep else "no")
+        return repair, repaired if self.keep else image
+
+
+def test_a_kept_repair_is_the_image_later_jobs_use():
+    fake, repair, saved = FakeStages(), FakeRepair(), []
+    stages = Stages(fake.prepare, fake.generate, fake.caption, check=FakeGate(), repair=repair)
+
+    results = run(
+        REFERENCE, TWO_JOBS, stages, max_attempts=3,
+        on_image=lambda job, image: saved.append(image.getpixel((0, 0))),
+    )  # fmt: skip
+
+    assert repair.reference is fake.picture_1
+    assert repair.calls == [("view/a", 10), ("view/b", 11)]
+    assert results[0].image.getpixel((0, 0)) == (0, 0, 255)
+    assert saved[0] == (0, 0, 255)
+    last_inputs = [call[2] for call in fake.calls if call[0] == "generate"][-1]
+    assert last_inputs[1] is results[0].image
+    assert results[0].repair.seed == 510
+    assert results[0].check.identity == 0.005  # the repaired image's check
+
+
+def test_a_rejected_repair_leaves_the_original():
+    fake = FakeStages()
+    stages = Stages(fake.prepare, fake.generate, fake.caption, check=FakeGate(),
+                    repair=FakeRepair(keep=False))  # fmt: skip
+
+    results = run(REFERENCE, TWO_JOBS, stages, max_attempts=3)
+
+    assert results[0].image.getpixel((0, 0)) == (10, 0, 0)
+    assert results[0].repair.kept is False
+    assert results[0].check.identity == 0.01  # still the generated image's check

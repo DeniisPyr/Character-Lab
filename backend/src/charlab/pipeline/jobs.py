@@ -48,17 +48,35 @@ class Attempt:
 
 
 @dataclass(frozen=True)
+class Repair:
+    """A face repair: the repaired image's check, and whether it replaced the original."""
+
+    seed: int
+    check: Check
+    kept: bool
+    reason: str
+
+
+@dataclass(frozen=True)
 class Result:
     job: Job
     image: Image.Image
     description: str | None  # from the caption stage, before the caption is built
     attempts: tuple[Attempt, ...] = ()
     kept: int = 0  # the attempt whose image this is
+    repair: Repair | None = None
 
     @property
     def seed(self) -> int:
         """The seed of the image that was kept."""
         return self.attempts[self.kept].seed if self.attempts else self.job.seed
+
+    @property
+    def check(self) -> Check | None:
+        """The final image's check: the repair's if a repair was kept."""
+        if self.repair and self.repair.kept:
+            return self.repair.check
+        return self.attempts[self.kept].check if self.attempts else None
 
 
 def plan(recipe: Recipe, seed: int, description: str | None = None) -> list[Job]:

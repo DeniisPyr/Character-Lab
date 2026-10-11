@@ -56,6 +56,7 @@ def test_recipe_path_is_relative_to_the_file_that_sets_it(tmp_path):
         ("prepare:\n  background: blur\n", "'auto', 'remove' or 'keep'"),
         ("generation:\n  transformer: fp8\n", "'bf16' or 'gguf'"),
         ("style: realistic\n", "Input should be 'anime'"),
+        ("face_repair:\n  mode: sometimes\n", "'off', 'failed' or 'small'"),
         ("caption:\n  task: '<OD>'\n", "'<CAPTION>', '<DETAILED_CAPTION>' or"),
         ("prepare:\n  crop_margin: 2\n", "less than or equal to 1"),
     ],
@@ -71,3 +72,8 @@ def test_merge_is_deep_and_leaves_inputs_unchanged():
 
     assert merge(base, override) == {"a": 1, "nested": {"x": 1, "y": 3}, "b": 4}
     assert base == {"a": 1, "nested": {"x": 1, "y": 2}}
+
+
+def test_a_bare_off_switches_face_repair_off(tmp_path):
+    # YAML reads `off` as false; the setting still understands it.
+    assert load_settings(write(tmp_path, "face_repair:\n  mode: off\n")).face_repair.mode == "off"

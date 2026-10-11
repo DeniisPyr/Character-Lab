@@ -72,7 +72,7 @@ class Export:
         images = [
             {
                 "image": f"{self._stems[result.job.key]}.png",
-                "passed": _passed(result.attempts[result.kept]),
+                "passed": None if result.check is None else result.check.passed,
                 "kept_attempt": result.kept + 1,
                 "attempts": [_attempt(attempt) for attempt in result.attempts],
             }
@@ -109,11 +109,6 @@ _LIMITS = {
     "min_sharpness",
     "duplicate_max_bits",
 }
-
-
-def _passed(attempt: Attempt) -> bool | None:
-    """None without a quality gate."""
-    return None if attempt.check is None else attempt.check.passed
 
 
 def _attempt(attempt: Attempt) -> dict[str, Any]:

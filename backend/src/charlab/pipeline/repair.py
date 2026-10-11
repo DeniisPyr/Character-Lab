@@ -12,19 +12,28 @@ front-facing reference it drew a front face over a side profile. So a repair is 
 only: it has to be checked before it replaces the original.
 """
 
+import logging
+
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 from charlab.config import FaceRepairSettings
 from charlab.pipeline.faces import Face
-from charlab.pipeline.jobs import Check
+from charlab.pipeline.jobs import Check, Job, Repair
+from charlab.pipeline.quality import QualityGate
 from charlab.pipeline.stages import Generate
+
+log = logging.getLogger(__name__)
 
 REPAIR_SIZE = 1024
 # The crop's side as a multiple of the face's longer side: room for hair and neck, so the
 # redrawn face fits its surroundings.
 CROP_SCALE = 2.2
 MIN_CROP = 128
+
+# A repair's seed is the kept attempt's seed plus this. Retry seeds step by 1000, so a repair
+# never reuses one.
+REPAIR_SEED_STEP = 500
 
 PROMPT = (
     "Redraw Picture 1 exactly, with the same framing, head angle, pose, expression, hair and "
@@ -158,3 +167,43 @@ def keep_repair(
         f"kept: layout {layout:.2f}, face moved {moved:.2f}x, sharpness "
         f"{sharp_before or 0:.2f} -> {sharp_after or 0:.2f}"
     )
+
+
+class FaceRepairStage:
+    """The repair stage: picks the faces that need redrawing, repairs them, checks the result
+    with the quality gate, and keeps it only if `keep_repair` agrees."""
+
+    def __init__(self, settings: FaceRepairSettings, generate: Generate, gate: QualityGate):
+        self.settings = settings
+        self.gate = gate
+        self.repairer = FaceRepairer(generate)
+        self._reference: Image.Image | None = None
+
+    def start(self, reference: Image.Image) -> None:
+        """Cut the face reference (Picture 2 of every repair) from the prepared reference."""
+        if not self.settings.use_reference:
+            return
+        faces = self.gate.detect(reference)
+        if faces:
+            self._reference = reference.crop(crop_box(faces[0], reference))
+        else:
+            log.warning("no face found in the reference; repairs run without a face reference")
+
+    def needs_repair(self, job: Job, check: Check) -> bool:
+        if self.settings.mode == "off" or not job.face or check.face is None:
+            return False
+        if check.failures:
+            return True
+        return self.settings.mode == "small" and check.face.size < self.settings.small_below_px
+
+    def __call__(
+        self, job: Job, image: Image.Image, check: Check, seed: int
+    ) -> tuple[Repair, Image.Image] | None:
+        if not self.needs_repair(job, check):
+            return None
+        repair_seed = seed + REPAIR_SEED_STEP
+        repaired = self.repairer(image, check.face, repair_seed, self._reference)
+        after = self.gate(job, repaired)
+        keep, reason = keep_repair(image, repaired, check, after, self.settings)
+        log.info("%s, face repair: %s", job.key, reason)
+        return Repair(repair_seed, after, keep, reason), repaired if keep else image
