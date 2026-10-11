@@ -16,7 +16,7 @@ captions each one, and writes them as image/caption pairs ready for a LoRA train
 | Scenes | city walk, hilltop sunset, lantern market, meadow | 1280×720 |
 
 > **Status: work in progress.** The full pipeline works and is tested on a GPU: preparing the
-> reference, generating, captioning and exporting the dataset. Face refinement, a quality gate
+> reference, generating, checking quality, captioning and exporting the dataset. Face repair
 > and evaluation come next.
 
 ## How it works
@@ -31,7 +31,10 @@ captions each one, and writes them as image/caption pairs ready for a LoRA train
    the back view, which keeps the outfit and face consistent. The dataset is described in
    a YAML recipe, [backend/configs/recipes/lora-character.yaml](backend/configs/recipes/lora-character.yaml).
    The Lightning LoRA cuts sampling to 4 steps. Each image is saved as soon as it is made.
-3. **Caption.** The generator frees the GPU, then
+3. **Check.** A quality gate scores each image as soon as it is made: is it the same
+   character, and is the face there, big enough and sharp? A failed image is made again with
+   a new seed (see [Quality gate](#quality-gate)).
+4. **Caption.** The generator frees the GPU, then
    [Florence-2](https://huggingface.co/florence-community/Florence-2-large) describes each
    image. The caption is the trigger word, then tags from the recipe, then the cleaned
    description.
@@ -40,11 +43,15 @@ captions each one, and writes them as image/caption pairs ready for a LoRA train
    - **The cleanup** removes the character's fixed look (hair, eye colour, skin), guesses
      about the person and filler. That way the look binds to the trigger word, while the
      outfit, pose and background stay described.
-4. **Export.** Numbered image/caption pairs and a `manifest.json` (see [Output](#output)).
+5. **Export.** Numbered image/caption pairs, a `manifest.json` and a `report.json` (see
+   [Output](#output)).
 
 Every image has its own seed, so a run is reproducible: the same reference, seed and
-settings give byte-identical images. Repeat runs on three different A100 machines matched
-exactly.
+settings give byte-identical images on the same GPU model and torch CUDA build. Repeat runs on
+three A100 machines with CUDA 13 matched exactly. An A100 with the CUDA 12.6 build gave close
+variations instead: the same character, pose and composition, with small details such as
+background shapes changed. The two builds' math libraries round slightly differently, and
+diffusion amplifies that.
 
 ## Requirements
 
@@ -61,13 +68,14 @@ Generation has two modes, set with `generation.transformer`:
 | What runs | the full model, all on the GPU | a [quantized transformer](https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF) (Q6_K); each model moves to the GPU only while it runs |
 | Peak GPU memory | 61.4 GiB | 21.0 GiB |
 | First download | about 60 GB | about 36 GB |
-| Full run, 16 images with captions | 10–15 min: 5.5–11.5 min loading, 2.5 min generating, 1 min captioning | 16–18 min: 3–4 min loading, 10.5–13 min generating, 1 min captioning |
+| Full run, 16 images with captions | 6.5–15 min: 3.5–11.5 min loading, 2–2.5 min generating and checking, 0.5–1 min captioning | 16–18 min: 3–4 min loading, 10.5–13 min generating, 1 min captioning |
 
 **About these numbers:**
 - **Where they come from:** runs on A100 80 GB GPUs, in October 2026. The `gguf` numbers come
   from the same A100s with PyTorch limited to 23 GiB of GPU memory, to act like a 24 GB card.
   Times on a real RTX 4090 will differ.
-- **Loading time** depends mostly on how fast the machine's disk reads the weights.
+- **Loading time** depends mostly on the machine: the same A100 type took 3.5 minutes on one
+  host and 11.5 on another.
 - **Captioning** needs only 2.4 GiB of GPU memory, because the generator frees the GPU first.
 - **Quality:** side by side, the `gguf` images look the same as the `bf16` ones.
 - **System RAM:** in `gguf` mode the models wait in system RAM between uses, so plan for about
@@ -147,7 +155,8 @@ only needs the values it changes.
 - **Downloading in advance:** to fetch the default models before running, use
   `hf download Qwen/Qwen-Image-Edit-2511`,
   `hf download lightx2v/Qwen-Image-Edit-2511-Lightning Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors`
-  and `hf download florence-community/Florence-2-large`.
+  and `hf download florence-community/Florence-2-large`. The quality gate's two small models
+  (about 200 MB) download on first use.
 - **On RunPod:** the PyTorch template sets `HF_HUB_ENABLE_HF_TRANSFER=1` without installing
   `hf_transfer`, which makes every download fail. Run `unset HF_HUB_ENABLE_HF_TRANSFER`
   first.
@@ -173,6 +182,7 @@ results/mychar/
   016_scenes_meadow_rest.png
   016_scenes_meadow_rest.txt
   manifest.json                    the run's settings and models; seed, prompt and caption per image
+  report.json                      the quality gate's scores for every attempt at every image
 results/mychar.zip                 with --zip
 ```
 
@@ -187,6 +197,34 @@ name. A caption, for example `002_turnaround_three_quarter.txt`:
 
 The hair is left out on purpose, so it binds to `mychar`. Each caption's tags are set in the
 recipe; `--dry-run` shows how each caption will start.
+
+## Quality gate
+
+Each image is scored right after it is generated. Both models are small and run on the CPU
+with ONNX Runtime, adding well under a second per image.
+
+| Check | Passes when | Measured on one character's 16 images |
+|---|---|---|
+| Same character ([CCIP](https://huggingface.co/deepghs/ccip_onnx), whole image vs the reference) | difference below 0.1785 | 0.008–0.063; 12 other anime characters scored 0.32–0.48 |
+| Face present ([anime face detector](https://huggingface.co/deepghs/anime_face_detection)) | a face is found; the recipe marks shots from behind as having none | found in all 15 front-facing shots |
+| Face size | shorter side of at least 64 px | 79–423 px |
+| Face sharpness | at least 0.07× the reference face's (variance of the Laplacian) | 0.14× and up; a blurred copy scored 0.02× |
+
+**When a check fails:**
+- The image is made again with the seed plus 1000, up to 3 tries.
+- This happens before the next image, so later shots that use it as Picture 2 get the kept
+  version.
+- If no try passes, the best one is kept and listed in the summary.
+
+**`report.json`** records every try: its seed, scores, face box and failure reasons. It also
+lists near-exact copies, found with a 64-bit image fingerprint. These are reported, not
+rejected: distinct shots on a white background can be as close as 5 bits, so a fingerprint
+can only catch true copies.
+
+**Changing the limits:** they are under `quality:` in
+[backend/configs/default.yaml](backend/configs/default.yaml). The models suit anime and
+illustrated characters (`style: anime`, the only style so far). A realistic style with its
+own detector and identity model is planned.
 
 ## Development
 
@@ -203,7 +241,9 @@ on Linux, macOS and Windows.
 
 ## Models and licenses
 
-The code is MIT-licensed ([LICENSE](LICENSE)). It downloads these models at run time:
+The code is MIT-licensed ([LICENSE](LICENSE)). The quality gate's image preprocessing follows
+DeepGHS's [imgutils](https://github.com/deepghs/imgutils) (MIT). It downloads these models at
+run time:
 
 | Model | Used for | License |
 |---|---|---|
@@ -211,4 +251,6 @@ The code is MIT-licensed ([LICENSE](LICENSE)). It downloads these models at run 
 | [lightx2v/Qwen-Image-Edit-2511-Lightning](https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning) | 4-step sampling | Apache-2.0 |
 | [unsloth/Qwen-Image-Edit-2511-GGUF](https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF) | `gguf` mode | Apache-2.0 |
 | [florence-community/Florence-2-large](https://huggingface.co/florence-community/Florence-2-large) | captions | MIT |
+| [deepghs/anime_face_detection](https://huggingface.co/deepghs/anime_face_detection) (`face_detect_v1.4_s`) | quality gate: faces | MIT |
+| [deepghs/ccip_onnx](https://huggingface.co/deepghs/ccip_onnx) (`ccip-caformer-24-randaug-pruned`) | quality gate: identity | OpenRAIL |
 | [BiRefNet](https://github.com/ZhengPeng7/BiRefNet), via rembg (`birefnet-general`) | background removal | MIT |
