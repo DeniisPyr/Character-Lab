@@ -39,6 +39,8 @@ class GenerationSettings(_Model):
 class QualitySettings(_Model):
     face_detector: HubFile
     face_confidence: float = Field(gt=0, lt=1)
+    ccip_features: HubFile
+    ccip_metric: HubFile
 
 
 class CaptionSettings(_Model):
