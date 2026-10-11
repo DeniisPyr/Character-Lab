@@ -36,6 +36,11 @@ class GenerationSettings(_Model):
     cfg: float = Field(ge=0)
 
 
+class QualitySettings(_Model):
+    face_detector: HubFile
+    face_confidence: float = Field(gt=0, lt=1)
+
+
 class CaptionSettings(_Model):
     model: str
     task: Literal["<CAPTION>", "<DETAILED_CAPTION>", "<MORE_DETAILED_CAPTION>"]
@@ -55,8 +60,10 @@ class PrepareSettings(_Model):
 class Settings(_Model):
     seed: int = Field(ge=0)
     recipe: Path
+    style: Literal["anime"]
     prepare: PrepareSettings
     generation: GenerationSettings
+    quality: QualitySettings
     caption: CaptionSettings
 
 
