@@ -5,7 +5,7 @@ from PIL import Image, ImageFilter
 from charlab.config import load_settings
 from charlab.pipeline.faces import Face
 from charlab.pipeline.jobs import Job
-from charlab.pipeline.quality import QualityGate, sharpness
+from charlab.pipeline.quality import QualityGate, duplicates, fingerprint, sharpness
 
 SETTINGS = load_settings().quality
 FACE = Face((100, 100, 228, 228), 0.85)  # 128 px
@@ -100,3 +100,24 @@ def test_images_cannot_be_checked_before_the_reference():
 
     with pytest.raises(RuntimeError, match="call start"):
         checker(JOB, SHARP)
+
+
+def waves(size=256):
+    """A smooth pattern with structure in both directions."""
+    y, x = np.indices((size, size)) / size
+    pixels = 127 + 127 * np.sin(6 * x) * np.cos(4 * y)
+    return Image.fromarray(pixels.astype(np.uint8)).convert("RGB")
+
+
+def test_fingerprint_is_64_bits_and_survives_resizing():
+    image = waves()
+
+    assert fingerprint(image).shape == (64,)
+    assert (fingerprint(image) != fingerprint(image.resize((97, 97)))).sum() <= 2
+
+
+def test_only_near_exact_copies_count_as_duplicates():
+    pattern = waves()
+    images = {"a": pattern, "b": pattern.copy(), "c": pattern.transpose(Image.FLIP_LEFT_RIGHT)}
+
+    assert duplicates(images, max_bits=2) == [("a", "b", 0)]

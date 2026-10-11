@@ -77,6 +77,10 @@ quality:
   # - Face sharpness as a share of the reference face's (variance of the Laplacian). Ours:
   #   0.14x and up; small or dark faces score low. A blurred copy scored 0.02x.
   min_sharpness: 0.07
+  # - Near-duplicates are reported in report.json, not rejected: pairs whose 64-bit
+  #   fingerprints differ in this many bits or fewer. A re-saved copy differs in 0; distinct
+  #   shots on white differed in as few as 5 (front vs back view).
+  duplicate_max_bits: 2
 
 caption:
   # Florence-2 large in transformers' own format, so no remote code runs. 1.55 GB; fast

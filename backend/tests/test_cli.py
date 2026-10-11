@@ -166,8 +166,11 @@ def test_real_run_writes_the_captioned_dataset(capsys, fake_models, reference, t
     assert main(["generate", reference, "--trigger", "mychar", "--out", str(out)]) == 0
 
     names = {path.name for path in out.iterdir()}
-    assert len(names) == 16 * 2 + 1
+    assert len(names) == 16 * 2 + 2
     assert {"001_turnaround_front.png", "016_scenes_meadow_rest.txt", "manifest.json"} <= names
+    report = json.loads((out / "report.json").read_text("utf-8"))
+    assert report["summary"]["passed"] == 16
+    assert report["summary"]["retried"] == report["summary"]["failed"] == []
     assert Image.open(out / "013_scenes_city_walk.png").size == (1280, 720)
     assert (out / "001_turnaround_front.txt").read_text("utf-8") == (
         "mychar, full body, front view, standing, plain white background. "
@@ -190,6 +193,11 @@ def test_a_failed_image_is_regenerated_with_a_new_seed(fake_models, reference, t
 
     manifest = json.loads((out / "manifest.json").read_text("utf-8"))
     assert [image["seed"] for image in manifest["images"][:2]] == [42 + 1000, 43]
+    report = json.loads((out / "report.json").read_text("utf-8"))
+    assert report["summary"]["retried"] == ["001_turnaround_front.png"]
+    front = report["images"][0]
+    assert [attempt["passed"] for attempt in front["attempts"]] == [False, True]
+    assert front["kept_attempt"] == 2
 
 
 def test_zip_option_packs_the_dataset(capsys, fake_models, reference, tmp_path):
@@ -198,7 +206,7 @@ def test_zip_option_packs_the_dataset(capsys, fake_models, reference, tmp_path):
     assert main(["generate", reference, "--trigger", "mychar", "--out", str(out), "--zip"]) == 0
 
     with zipfile.ZipFile(tmp_path / "mychar.zip") as packed:
-        assert len(packed.namelist()) == 33
+        assert len(packed.namelist()) == 34
     assert "packed the dataset into" in capsys.readouterr().out
 
 
