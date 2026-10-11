@@ -1,6 +1,7 @@
-"""Caption stage: describe each image with Florence-2."""
+"""Caption stage: describe each image with Florence-2, then build the training caption."""
 
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -11,6 +12,50 @@ from charlab.config import CaptionSettings
 from charlab.pipeline.stages import StageUnavailable
 
 log = logging.getLogger(__name__)
+
+# The rules below were written against Florence-2's descriptions of generated images. It
+# describes the hair in almost every caption, guesses age and build, and ends with filler.
+#
+# Sentences dropped whole: the character's fixed look, which should bind to the trigger word
+# instead; guesses about the person; and filler about the image as a whole. The outfit stays,
+# so it can still be changed by prompt.
+_DROP = re.compile(
+    r"\bhair\b"
+    r"|\b(?:blue|brown|green|grey|gray|hazel|amber|dark|black) eyes\b"
+    r"|\b(?:fair|pale|light|olive|tan|dark) skin\b|\bfreckles\b|\bmakeup\b"
+    r"|\b(?:her|his|their) body\b|\bappears to be in (?:her|his|their)\b|\byears old\b"
+    r"|\boverall mood\b|\bfocal point\b|\brendering\b",
+    re.IGNORECASE,
+)
+# "with long, wavy hair" or "and has long dark hair that is styled in loose waves": cut out,
+# so the rest of the sentence (the shot, the pose, the outfit) stays. Only attached clauses:
+# in "The woman has long hair that ... and falls over her shoulders", the hair is the whole
+# sentence, which _DROP then removes.
+_HAIR_CLAUSE = re.compile(
+    r",?\s+(?:with|and\s+has)\s+(?:[\w-]+,?\s+){0,4}hair\b(?:\s+that\s+[^.]*)?(?=[.,]|\s+and\s)",
+    re.IGNORECASE,
+)
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def clean_description(text: str) -> str:
+    """Remove the character's fixed look and filler from a Florence-2 description."""
+    kept = []
+    for sentence in _SENTENCE_END.split(text.strip()):
+        sentence = _HAIR_CLAUSE.sub("", sentence)
+        if sentence and not _DROP.search(sentence):
+            kept.append(sentence)
+    return " ".join(kept)
+
+
+def build_caption(trigger: str, tags: str, description: str | None) -> str:
+    """The training caption: the trigger word, the recipe's tags, then the cleaned description.
+
+    The tags state what Florence-2 often gets wrong: the view, the framing, the expression.
+    """
+    head = ", ".join(part for part in (trigger, tags.strip().rstrip(".")) if part) + "."
+    body = clean_description(description or "")
+    return f"{head} {body}" if body else head
 
 
 @dataclass(frozen=True)

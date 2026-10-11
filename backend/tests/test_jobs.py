@@ -18,6 +18,13 @@ def test_shipped_plan_has_a_job_per_variant_with_references_first():
             assert order.index(reference) < order.index(job.key)
 
 
+def test_every_shipped_job_carries_its_caption_tags():
+    jobs = {job.key: job for job in shipped_plan()}
+
+    assert all(job.caption for job in jobs.values())
+    assert jobs["turnaround/back"].caption.startswith("full body, back view")
+
+
 def test_shipped_plan_seeds_are_distinct_and_reproducible():
     jobs = shipped_plan()
 

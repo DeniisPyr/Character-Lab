@@ -32,6 +32,8 @@ class Variant(_Model):
     blocks: tuple[str, ...] = ()
     setting: str | None = None
     references: tuple[str, ...] = ()
+    # Tags for the training caption, written after the trigger word.
+    caption: str = ""
 
     @field_validator("references")
     @classmethod

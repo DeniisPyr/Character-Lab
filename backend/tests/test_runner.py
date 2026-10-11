@@ -60,7 +60,7 @@ def test_full_pipeline_with_fake_stages():
         assert all(a is b for a, b in zip(images[1:], expected, strict=True))
         assert image is generated[job.key]
         assert image.size == job.size
-    assert [result.caption for result in results] == [
+    assert [result.description for result in results] == [
         f"a {width}x{height} image" for width, height in (job.size for job in jobs)
     ]
 
@@ -74,12 +74,12 @@ def test_captioning_starts_after_all_images_are_generated():
     assert kinds == ["prepare"] + ["generate"] * 16 + ["caption"] * 16
 
 
-def test_without_a_caption_stage_results_have_no_captions():
+def test_without_a_caption_stage_results_have_no_descriptions():
     fake = FakeStages()
 
     results = run(REFERENCE, shipped_jobs(), Stages(fake.prepare, fake.generate))
 
-    assert [result.caption for result in results] == [None] * 16
+    assert [result.description for result in results] == [None] * 16
     assert "caption" not in [call[0] for call in fake.calls]
 
 
