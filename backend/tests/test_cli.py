@@ -1,3 +1,5 @@
+import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -20,14 +22,40 @@ def reference(tmp_path):
 class FakeGenerator:
     def __init__(self, settings):
         self.settings = settings
+        self.calls = 0
 
     def __call__(self, prompt, images, size, seed):
+        self.calls += 1
         return Image.new("RGB", size, "grey")
+
+    def unload(self):
+        pass
 
 
 class NoGpu(FakeGenerator):
     def __call__(self, prompt, images, size, seed):
         raise StageUnavailable("generation needs an NVIDIA GPU with CUDA")
+
+
+class CrashOnThird(FakeGenerator):
+    def __call__(self, prompt, images, size, seed):
+        if self.calls == 2:
+            raise RuntimeError("CUDA out of memory")
+        return super().__call__(prompt, images, size, seed)
+
+
+class FakeCaptioner:
+    def __init__(self, settings):
+        self.settings = settings
+
+    def __call__(self, image):
+        return "A woman stands in a studio. Her hair is long and wavy."
+
+
+@pytest.fixture
+def fake_models(monkeypatch):
+    monkeypatch.setattr(cli, "QwenGenerator", FakeGenerator)
+    monkeypatch.setattr(cli, "FlorenceCaptioner", FakeCaptioner)
 
 
 def test_version_flag_prints_version(capsys):
@@ -54,6 +82,7 @@ def test_dry_run_prints_the_plan(capsys, reference):
     assert "16. scenes/meadow_rest" in out
     assert "+ portrait/front" in out
     assert "Show the character's full body standing upright" in out
+    assert "caption: mychar, full body, front view, standing, plain white background." in out
 
 
 def test_dry_run_uses_description_out_and_config(capsys, reference, tmp_path):
@@ -108,20 +137,47 @@ def test_invalid_config_is_reported(capsys, reference, tmp_path):
     assert "Extra inputs" in capsys.readouterr().err
 
 
-def test_real_run_saves_one_image_per_variant(capsys, monkeypatch, reference, tmp_path):
-    monkeypatch.setattr(cli, "QwenGenerator", FakeGenerator)
+def test_real_run_writes_the_captioned_dataset(capsys, fake_models, reference, tmp_path):
     out = tmp_path / "out"
 
     assert main(["generate", reference, "--trigger", "mychar", "--out", str(out)]) == 0
 
-    files = sorted(path.name for path in out.iterdir())
-    assert len(files) == 16
-    assert "turnaround_front.png" in files
-    assert Image.open(out / "scenes_city_walk.png").size == (1280, 720)
-    assert f"saved 16 images to {out}" in capsys.readouterr().out
+    names = {path.name for path in out.iterdir()}
+    assert len(names) == 16 * 2 + 1
+    assert {"001_turnaround_front.png", "016_scenes_meadow_rest.txt", "manifest.json"} <= names
+    assert Image.open(out / "013_scenes_city_walk.png").size == (1280, 720)
+    assert (out / "001_turnaround_front.txt").read_text("utf-8") == (
+        "mychar, full body, front view, standing, plain white background. "
+        "A woman stands in a studio.\n"
+    )
+    manifest = json.loads((out / "manifest.json").read_text("utf-8"))
+    assert (manifest["trigger"], manifest["reference"]) == ("mychar", "ref.png")
+    assert manifest["generation"]["transformer"] == "bf16"
+    assert len(manifest["images"]) == 16
+    assert f"saved 16 images with captions to {out}" in capsys.readouterr().out
 
 
-def test_unavailable_stage_is_reported(capsys, monkeypatch, reference, tmp_path):
+def test_zip_option_packs_the_dataset(capsys, fake_models, reference, tmp_path):
+    out = tmp_path / "mychar"
+
+    assert main(["generate", reference, "--trigger", "mychar", "--out", str(out), "--zip"]) == 0
+
+    with zipfile.ZipFile(tmp_path / "mychar.zip") as packed:
+        assert len(packed.namelist()) == 33
+    assert "packed the dataset into" in capsys.readouterr().out
+
+
+def test_images_made_before_a_crash_are_kept(fake_models, monkeypatch, reference, tmp_path):
+    monkeypatch.setattr(cli, "QwenGenerator", CrashOnThird)
+
+    with pytest.raises(RuntimeError, match="out of memory"):
+        main(["generate", reference, "--trigger", "mychar", "--out", str(tmp_path / "out")])
+
+    names = sorted(path.name for path in (tmp_path / "out").iterdir())
+    assert names == ["001_turnaround_front.png", "002_turnaround_three_quarter.png"]
+
+
+def test_unavailable_stage_is_reported(capsys, fake_models, monkeypatch, reference, tmp_path):
     monkeypatch.setattr(cli, "QwenGenerator", NoGpu)
 
     assert main(["generate", reference, "--trigger", "mychar", "--out", str(tmp_path)]) == 2

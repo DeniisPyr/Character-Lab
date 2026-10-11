@@ -12,13 +12,15 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from charlab import __version__
-from charlab.config import load_settings
+from charlab.config import Settings, load_settings
+from charlab.pipeline.caption import FlorenceCaptioner, build_caption
+from charlab.pipeline.export import Export
 from charlab.pipeline.generate import QwenGenerator
 from charlab.pipeline.jobs import Job, plan
 from charlab.pipeline.prepare import InvalidReference, load_reference, prepare_reference
 from charlab.pipeline.runner import run
 from charlab.pipeline.stages import Stages, StageUnavailable
-from charlab.recipe import load_recipe
+from charlab.recipe import Recipe, load_recipe
 
 TRIGGER = re.compile(r"^[A-Za-z0-9_-]+$")
 
@@ -45,10 +47,11 @@ def build_parser() -> argparse.ArgumentParser:
     generate.add_argument(
         "--dry-run", action="store_true", help="print the generation plan without loading models"
     )
+    generate.add_argument("--zip", action="store_true", help="also pack the dataset into <out>.zip")
     return parser
 
 
-def format_plan(jobs: Sequence[Job], header: Sequence[str]) -> str:
+def format_plan(jobs: Sequence[Job], header: Sequence[str], trigger: str) -> str:
     lines = [*header, ""]
     width = max(len(job.key) for job in jobs)
     for number, job in enumerate(jobs, start=1):
@@ -60,7 +63,27 @@ def format_plan(jobs: Sequence[Job], header: Sequence[str]) -> str:
         lines += textwrap.wrap(
             job.prompt, width=96, initial_indent=" " * 4, subsequent_indent=" " * 4
         )
+        lines += textwrap.wrap(
+            f"{build_caption(trigger, job.caption, None)} + the image's description",
+            width=96,
+            initial_indent="    caption: ",
+            subsequent_indent=" " * 13,
+        )
     return "\n".join(lines)
+
+
+def _run_record(args: argparse.Namespace, settings: Settings, recipe: Recipe) -> dict:
+    """What the manifest records about the run, enough to repeat it."""
+    return {
+        "charlab": __version__,
+        "reference": args.reference.name,
+        "recipe": recipe.name,
+        "seed": settings.seed,
+        "description": args.description,
+        "prepare": settings.prepare.model_dump(),
+        "generation": settings.generation.model_dump(),
+        "captioning": settings.caption.model_dump(),
+    }
 
 
 def _error(message: str) -> int:
@@ -87,23 +110,33 @@ def _generate(args: argparse.Namespace) -> int:
             f"trigger:   {args.trigger}",
             f"output:    {out}",
         ]
-        print(format_plan(jobs, header))
+        print(format_plan(jobs, header, args.trigger))
         return 0
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    generator = QwenGenerator(settings.generation)
     stages = Stages(
         prepare=partial(prepare_reference, settings=settings.prepare),
-        generate=QwenGenerator(settings.generation),
+        generate=generator,
+        caption=FlorenceCaptioner(settings.caption),
     )
+    export = Export(out, jobs)
     try:
-        results = run(args.reference, jobs, stages)
+        results = run(
+            args.reference,
+            jobs,
+            stages,
+            on_image=export.save_image,
+            # Frees the GPU before the caption model loads.
+            after_generate=generator.unload,
+        )
     except (InvalidReference, StageUnavailable) as error:
         return _error(str(error))
 
-    out.mkdir(parents=True, exist_ok=True)
-    for result in results:
-        result.image.save(out / f"{result.job.view}_{result.job.variant}.png")
-    print(f"saved {len(results)} images to {out}")
+    export.write_captions(results, args.trigger, _run_record(args, settings, recipe))
+    print(f"saved {len(results)} images with captions to {out}")
+    if args.zip:
+        print(f"packed the dataset into {export.zip()}")
     return 0
 
 
