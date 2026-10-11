@@ -82,7 +82,9 @@ def _run_record(args: argparse.Namespace, settings: Settings, recipe: Recipe) ->
         "seed": settings.seed,
         "description": args.description,
         "prepare": settings.prepare.model_dump(),
+        "style": settings.style,
         "generation": settings.generation.model_dump(),
+        "quality": settings.quality.model_dump(),
         "captioning": settings.caption.model_dump(),
     }
 
@@ -139,6 +141,7 @@ def _generate(args: argparse.Namespace) -> int:
         return _error(str(error))
 
     export.write_captions(results, args.trigger, _run_record(args, settings, recipe))
+    export.write_report(results, settings.quality)
     print(f"saved {len(results)} images with captions to {out}")
     failed = [r.job.key for r in results if r.attempts[r.kept].check.failures]
     print(f"quality: {len(results) - len(failed)}/{len(results)} images passed every check")

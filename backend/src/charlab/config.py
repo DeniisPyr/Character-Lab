@@ -45,6 +45,7 @@ class QualitySettings(_Model):
     same_character_below: float = Field(gt=0)
     min_face_px: int = Field(ge=1)
     min_sharpness: float = Field(ge=0)
+    duplicate_max_bits: int = Field(ge=0, le=64)
 
 
 class CaptionSettings(_Model):

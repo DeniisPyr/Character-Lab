@@ -3,6 +3,7 @@
     001_turnaround_front.png   the image
     001_turnaround_front.txt   its training caption
     manifest.json              the run's settings, then every image with its seed and prompt
+    report.json                the quality gate's scores for every attempt at every image
 
 The number keeps files in generation order. LoRA trainers pair each image with the .txt of
 the same name.
@@ -16,8 +17,10 @@ from typing import Any
 
 from PIL import Image
 
+from charlab.config import QualitySettings
 from charlab.pipeline.caption import build_caption
-from charlab.pipeline.jobs import Job, Result
+from charlab.pipeline.jobs import Attempt, Job, Result
+from charlab.pipeline.quality import duplicates
 
 
 class Export:
@@ -63,6 +66,68 @@ class Export:
         manifest.write_text(json.dumps(content, indent=2) + "\n", encoding="utf-8")
         return manifest
 
+    def write_report(self, results: Sequence[Result], limits: QualitySettings) -> Path:
+        """Write the quality gate's scores for every attempt, plus near-duplicate pairs."""
+        self.out.mkdir(parents=True, exist_ok=True)
+        images = [
+            {
+                "image": f"{self._stems[result.job.key]}.png",
+                "passed": _passed(result.attempts[result.kept]),
+                "kept_attempt": result.kept + 1,
+                "attempts": [_attempt(attempt) for attempt in result.attempts],
+            }
+            for result in results
+        ]
+        pairs = duplicates(
+            {f"{self._stems[r.job.key]}.png": r.image for r in results}, limits.duplicate_max_bits
+        )
+        report = {
+            "summary": {
+                "images": len(images),
+                "passed": sum(image["passed"] is not False for image in images),
+                "retried": [i["image"] for i in images if len(i["attempts"]) > 1],
+                "failed": [i["image"] for i in images if i["passed"] is False],
+                "near_duplicates": len(pairs),
+            },
+            "limits": limits.model_dump(include=_LIMITS),
+            "images": images,
+            "near_duplicates": [{"a": a, "b": b, "different_bits": bits} for a, b, bits in pairs],
+        }
+        path = self.out / "report.json"
+        path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        return path
+
     def zip(self) -> Path:
         """Pack the dataset into <out>.zip, next to the folder."""
         return Path(shutil.make_archive(str(self.out), "zip", root_dir=self.out))
+
+
+_LIMITS = {
+    "max_attempts",
+    "same_character_below",
+    "min_face_px",
+    "min_sharpness",
+    "duplicate_max_bits",
+}
+
+
+def _passed(attempt: Attempt) -> bool | None:
+    """None without a quality gate."""
+    return None if attempt.check is None else attempt.check.passed
+
+
+def _attempt(attempt: Attempt) -> dict[str, Any]:
+    check = attempt.check
+    if check is None:
+        return {"seed": attempt.seed, "passed": None}
+    face = check.face
+    return {
+        "seed": attempt.seed,
+        "passed": check.passed,
+        "identity": round(check.identity, 4),
+        "face": None
+        if face is None
+        else {"box": list(face.box), "size": face.size, "confidence": round(face.confidence, 3)},
+        "sharpness": None if check.sharpness is None else round(check.sharpness, 3),
+        "failures": list(check.failures),
+    }

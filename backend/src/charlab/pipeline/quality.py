@@ -4,6 +4,8 @@ Checks, with limits from the settings:
 - identity: CCIP difference from the reference (every image, faces or not)
 - face: one found, and big enough (shots that should show a face)
 - sharpness: the face's, relative to the reference face's
+
+Near-duplicates are reported, not rejected: see `duplicates`.
 """
 
 import logging
@@ -42,6 +44,30 @@ def sharpness(image: Image.Image, face: Face) -> float:
         grey[:-2, 1:-1] + grey[2:, 1:-1] + grey[1:-1, :-2] + grey[1:-1, 2:] - 4 * grey[1:-1, 1:-1]
     )
     return float(laplacian.var())
+
+
+def fingerprint(image: Image.Image) -> np.ndarray:
+    """A 64-bit difference hash: whether each pixel of a 9x8 greyscale thumbnail is brighter
+    than the one to its right."""
+    grey = np.asarray(image.convert("L").resize((9, 8), Image.Resampling.LANCZOS), np.int16)
+    return (grey[:, 1:] > grey[:, :-1]).flatten()
+
+
+def duplicates(images: dict[str, Image.Image], max_bits: int) -> list[tuple[str, str, int]]:
+    """Pairs of images whose fingerprints differ in at most `max_bits` of 64 bits.
+
+    Only near-exact copies get this close: distinct shots of one character on a white
+    background can differ in as few as 5 bits, which is why this is reported, not rejected.
+    """
+    prints = {name: fingerprint(image) for name, image in images.items()}
+    names = list(prints)
+    pairs = []
+    for i, a in enumerate(names):
+        for b in names[i + 1 :]:
+            bits = int((prints[a] != prints[b]).sum())
+            if bits <= max_bits:
+                pairs.append((a, b, bits))
+    return pairs
 
 
 class QualityGate:
