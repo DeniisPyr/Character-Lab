@@ -197,6 +197,7 @@ def test_real_run_writes_the_captioned_dataset(capsys, fake_models, reference, t
     manifest = json.loads((out / "manifest.json").read_text("utf-8"))
     assert (manifest["trigger"], manifest["reference"]) == ("mychar", "ref.png")
     assert manifest["generation"]["transformer"] == "bf16"
+    assert manifest["face_repair"]["mode"] == "failed"
     assert len(manifest["images"]) == 16
     printed = capsys.readouterr().out
     assert f"saved 16 images with captions to {out}" in printed

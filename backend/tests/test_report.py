@@ -6,7 +6,7 @@ from PIL import Image
 from charlab.config import load_settings
 from charlab.pipeline.export import Export
 from charlab.pipeline.faces import Face
-from charlab.pipeline.jobs import Attempt, Check, Job, Result
+from charlab.pipeline.jobs import Attempt, Check, Job, Repair, Result
 
 LIMITS = load_settings().quality
 FACE = Face((10, 20, 110, 140), 0.8512)
@@ -45,6 +45,8 @@ def test_report_records_every_attempt_and_the_kept_one(tmp_path):
         "passed": 2,
         "retried": ["001_turnaround_front.png"],
         "failed": [],
+        "repaired": [],
+        "repairs_rejected": [],
         "near_duplicates": 0,
     }
     front = report["images"][0]
@@ -99,3 +101,48 @@ def test_without_a_gate_the_attempts_have_no_scores(tmp_path):
 
     assert report["images"][0]["passed"] is None
     assert report["images"][0]["attempts"] == [{"seed": 42, "passed": None}]
+
+
+def test_a_kept_repair_turns_a_failed_image_into_a_passed_one(tmp_path):
+    repaired = Check(0.011, FACE, 0.62)
+    results = [
+        Result(
+            JOBS[0],
+            image("red"),
+            None,
+            (Attempt(42, FAIL),) * 3,
+            repair=Repair(542, repaired, True, "kept: layout 1.00"),
+        ),  # fmt: skip
+        Result(
+            JOBS[1],
+            image("blue"),
+            None,
+            (Attempt(43, PASS),),
+            repair=Repair(543, FAIL, False, "layout changed: 0.74 < 0.95"),
+        ),  # fmt: skip
+    ]
+
+    report = write(tmp_path, results)
+
+    assert report["summary"]["failed"] == []
+    assert report["summary"]["repaired"] == ["001_turnaround_front.png"]
+    assert report["summary"]["repairs_rejected"] == ["002_turnaround_back.png"]
+    front = report["images"][0]
+    assert front["passed"] is True
+    assert front["repair"] == {
+        "seed": 542,
+        "kept": True,
+        "reason": "kept: layout 1.00",
+        "passed": True,
+        "identity": 0.011,
+        "face": {"box": [10, 20, 110, 140], "size": 100, "confidence": 0.851},
+        "sharpness": 0.62,
+        "failures": [],
+    }
+    assert report["images"][1]["repair"]["reason"] == "layout changed: 0.74 < 0.95"
+
+
+def test_images_without_a_repair_say_so(tmp_path):
+    results = [Result(job, image("red"), None, (Attempt(job.seed, PASS),)) for job in JOBS]
+
+    assert [i["repair"] for i in write(tmp_path, results)["images"]] == [None, None]
