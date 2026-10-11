@@ -25,6 +25,8 @@ gpu = [
     "diffusers>=0.37",
     # For the gguf transformer setting; diffusers needs 0.10 or newer.
     "gguf>=0.10",
+    # Runs the small quality-check models (face detector, CCIP) on the CPU.
+    "onnxruntime>=1.20",
     "peft>=0.17",
     "rembg[cpu]>=2.0.85",
     "torch>=2.6",

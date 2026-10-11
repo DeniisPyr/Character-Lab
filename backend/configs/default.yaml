@@ -9,6 +9,10 @@ seed: 42
 
 recipe: recipes/lora-character.yaml
 
+# The kind of character, which picks the models that check faces and identity. Only anime
+# (illustrated characters) for now; realistic comes later.
+style: anime
+
 prepare:
   # Limits for the reference image, checked before its pixels are decoded.
   max_file_mb: 20
@@ -43,6 +47,15 @@ generation:
   # The Lightning LoRA is distilled for 4 steps without classifier-free guidance (CFG 1).
   steps: 4
   cfg: 1.0
+
+quality:
+  # Anime face detector: YOLOv8 from DeepGHS, run on the CPU with onnxruntime (MIT, 45 MB).
+  face_detector:
+    repo: deepghs/anime_face_detection
+    file: face_detect_v1.4_s/model.onnx
+  # The model's F1-optimal confidence. It found one face in each of 15 generated images, at
+  # 0.79-0.86, and none in the back view.
+  face_confidence: 0.307
 
 caption:
   # Florence-2 large in transformers' own format, so no remote code runs. 1.55 GB; fast
