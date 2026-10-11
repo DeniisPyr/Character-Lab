@@ -5,7 +5,8 @@
 Turns one character image into a training-ready LoRA dataset.
 
 From a single reference image, Character Lab generates 16 consistent images of the same
-character with [Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511):
+character with [Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511),
+captions each one, and writes them as image/caption pairs ready for a LoRA trainer:
 
 | View | Images | Size |
 |---|---|---|
@@ -14,9 +15,9 @@ character with [Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edi
 | Expressions | joy, surprise, anger, sadness | 1024×1024 |
 | Scenes | city walk, hilltop sunset, lantern market, meadow | 1280×720 |
 
-> **Status: work in progress.** Reference preparation and image generation work and are
-> tested on a GPU. Captions and dataset export come next (v0.1.0), followed by face
-> refinement, a quality gate and evaluation.
+> **Status: work in progress.** The full pipeline works and is tested on a GPU: preparing the
+> reference, generating, captioning and exporting the dataset. Face refinement, a quality gate
+> and evaluation come next.
 
 ## How it works
 
@@ -29,10 +30,20 @@ character with [Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edi
    Later views also get an earlier result as Picture 2, for example the front view for
    the back view, which keeps the outfit and face consistent. The dataset is described in
    a YAML recipe, [backend/configs/recipes/lora-character.yaml](backend/configs/recipes/lora-character.yaml).
-   The Lightning LoRA cuts sampling to 4 steps.
+   The Lightning LoRA cuts sampling to 4 steps. Each image is saved as soon as it is made.
+3. **Caption.** The generator frees the GPU, then
+   [Florence-2](https://huggingface.co/florence-community/Florence-2-large) describes each
+   image. The caption is the trigger word, then tags from the recipe, then the cleaned
+   description.
+   - **The tags** state what Florence-2 often gets wrong: the view, the framing and the
+     expression.
+   - **The cleanup** removes the character's fixed look (hair, eye colour, skin), guesses
+     about the person and filler. That way the look binds to the trigger word, while the
+     outfit, pose and background stay described.
+4. **Export.** Numbered image/caption pairs and a `manifest.json` (see [Output](#output)).
 
 Every image has its own seed, so a run is reproducible: the same reference, seed and
-settings give byte-identical images. Repeat runs on two different A100 machines matched
+settings give byte-identical images. Repeat runs on three different A100 machines matched
 exactly.
 
 ## Requirements
@@ -49,14 +60,18 @@ Generation has two modes, set with `generation.transformer`:
 | GPU | 80 GB (A100, H100) | 24 GB (RTX 3090, RTX 4090) |
 | What runs | the full model, all on the GPU | a [quantized transformer](https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF) (Q6_K); each model moves to the GPU only while it runs |
 | Peak GPU memory | 61.4 GiB | 21.0 GiB |
-| First download | 58.6 GB | about 35 GB |
-| 16 images | about 8.5 min: 5.5 min loading, 2.5 min generating | about 17 min: 3.7 min loading, 13 min generating |
+| First download | about 60 GB | about 36 GB |
+| Full run, 16 images with captions | 10–15 min: 5.5–11.5 min loading, 2.5 min generating, 1 min captioning | 16–18 min: 3–4 min loading, 10.5–13 min generating, 1 min captioning |
 
-These numbers were measured on one A100 80 GB, in October 2026. The `gguf` numbers come from
-the same A100 with PyTorch limited to 23 GiB of GPU memory, to act like a 24 GB card; times
-on a real RTX 4090 will differ. Side by side, the `gguf` images look the same as the `bf16`
-ones. In `gguf` mode the models wait in system RAM between uses, so plan for about 48 GB of
-RAM (an estimate; not yet measured on a home PC).
+**About these numbers:**
+- **Where they come from:** runs on A100 80 GB GPUs, in October 2026. The `gguf` numbers come
+  from the same A100s with PyTorch limited to 23 GiB of GPU memory, to act like a 24 GB card.
+  Times on a real RTX 4090 will differ.
+- **Loading time** depends mostly on how fast the machine's disk reads the weights.
+- **Captioning** needs only 2.4 GiB of GPU memory, because the generator frees the GPU first.
+- **Quality:** side by side, the `gguf` images look the same as the `bf16` ones.
+- **System RAM:** in `gguf` mode the models wait in system RAM between uses, so plan for about
+  48 GB of RAM. This is an estimate, not yet measured on a home PC.
 
 Generation is tested on Linux. Windows with an NVIDIA GPU should work, but is untested. Macs
 have no NVIDIA GPU, so they can run only the dry run and the tests.
@@ -100,7 +115,7 @@ pip install -e "./backend[gpu]"
 # Print the 16-image plan with every prompt and seed. Loads no models.
 charlab generate path/to/reference.png --trigger mychar --dry-run
 
-# Generate the images into results/mychar/
+# Generate and caption the dataset into results/mychar/
 charlab generate path/to/reference.png --trigger mychar
 ```
 
@@ -112,6 +127,7 @@ Options:
 | `--out DIR` | output folder (default `results/<trigger>`) |
 | `--config FILE` | a YAML file with the settings to change |
 | `--description "..."` | a sentence about the character's style or outfit, added to every prompt |
+| `--zip` | also pack the dataset into `<out>.zip` |
 
 On a **24 GB GPU**, create a file `24gb.yaml`:
 
@@ -129,8 +145,9 @@ only needs the values it changes.
   `~/.cache/huggingface`); the background-removal model goes to `REMBG_HOME` (default
   `~/.u2net`).
 - **Downloading in advance:** to fetch the default models before running, use
-  `hf download Qwen/Qwen-Image-Edit-2511` and
-  `hf download lightx2v/Qwen-Image-Edit-2511-Lightning Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors`.
+  `hf download Qwen/Qwen-Image-Edit-2511`,
+  `hf download lightx2v/Qwen-Image-Edit-2511-Lightning Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors`
+  and `hf download florence-community/Florence-2-large`.
 - **On RunPod:** the PyTorch template sets `HF_HUB_ENABLE_HF_TRANSFER=1` without installing
   `hf_transfer`, which makes every download fail. Run `unset HF_HUB_ENABLE_HF_TRANSFER`
   first.
@@ -145,6 +162,31 @@ only needs the values it changes.
 
 Use characters you created or have the rights to. Don't use photos of real people without
 their consent.
+
+## Output
+
+```
+results/mychar/
+  001_turnaround_front.png         the image
+  001_turnaround_front.txt         its caption
+  ...
+  016_scenes_meadow_rest.png
+  016_scenes_meadow_rest.txt
+  manifest.json                    the run's settings and models; seed, prompt and caption per image
+results/mychar.zip                 with --zip
+```
+
+LoRA trainers such as ai-toolkit and kohya pair each image with the `.txt` file of the same
+name. A caption, for example `002_turnaround_three_quarter.txt`:
+
+> mychar, full body, three-quarter view, standing, plain white background. The image is a
+> full-length portrait of a young woman standing in a relaxed pose. She is wearing a beige
+> off-the-shoulder dress with long sleeves and a round neckline. The dress is made of a soft,
+> lightweight fabric and has a relaxed fit. She has a neutral expression on her face and is
+> looking directly at the camera.
+
+The hair is left out on purpose, so it binds to `mychar`. Each caption's tags are set in the
+recipe; `--dry-run` shows how each caption will start.
 
 ## Development
 
@@ -168,4 +210,5 @@ The code is MIT-licensed ([LICENSE](LICENSE)). It downloads these models at run 
 | [Qwen/Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511) | image generation | Apache-2.0 |
 | [lightx2v/Qwen-Image-Edit-2511-Lightning](https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning) | 4-step sampling | Apache-2.0 |
 | [unsloth/Qwen-Image-Edit-2511-GGUF](https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF) | `gguf` mode | Apache-2.0 |
+| [florence-community/Florence-2-large](https://huggingface.co/florence-community/Florence-2-large) | captions | MIT |
 | [BiRefNet](https://github.com/ZhengPeng7/BiRefNet), via rembg (`birefnet-general`) | background removal | MIT |
