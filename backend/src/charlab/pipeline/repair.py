@@ -12,9 +12,12 @@ front-facing reference it drew a front face over a side profile. So a repair is 
 only: it has to be checked before it replaces the original.
 """
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
+from charlab.config import FaceRepairSettings
 from charlab.pipeline.faces import Face
+from charlab.pipeline.jobs import Check
 from charlab.pipeline.stages import Generate
 
 REPAIR_SIZE = 1024
@@ -92,3 +95,66 @@ class FaceRepairer:
             prompt, inputs = PROMPT + REFERENCE_PROMPT, [crop, reference]
         redrawn = self.generate(prompt, inputs, (REPAIR_SIZE, REPAIR_SIZE), seed)
         return blend(image, face, box, redrawn)
+
+
+# Layout is compared on a 16x16 greyscale thumbnail of the crop: fine detail (what a repair
+# should change) is averaged away, while the pose and the face's place (what it must keep)
+# remain.
+LAYOUT_SIZE = 16
+
+
+def layout_similarity(a: Image.Image, b: Image.Image) -> float:
+    """Correlation of two images' coarse layouts: 1.0 when only fine detail differs."""
+    vectors = []
+    for image in (a, b):
+        grey = image.convert("L").resize((LAYOUT_SIZE,) * 2, Image.Resampling.BOX)
+        vector = np.asarray(grey, dtype=np.float32).flatten()
+        vector -= vector.mean()
+        vectors.append(vector / (np.linalg.norm(vector) or 1.0))
+    return float(vectors[0] @ vectors[1])
+
+
+def _centre(face: Face) -> np.ndarray:
+    left, top, right, bottom = face.box
+    return np.array([(left + right) / 2, (top + bottom) / 2])
+
+
+def keep_repair(
+    before: Image.Image,
+    after: Image.Image,
+    before_check: Check,
+    after_check: Check,
+    limits: FaceRepairSettings,
+) -> tuple[bool, str]:
+    """Whether the repaired image should replace the original, and why.
+
+    A repair must keep the structure (the same layout, the face in the same place) and be
+    better: sharper, no further from the character, and failing no more checks. The structure
+    test exists because a better identity score alone can be gamed: in the GPU experiment, a
+    front face drawn over a side profile scored closer to the front-facing reference.
+    """
+    face = before_check.face
+    if face is None or after_check.face is None:
+        return False, "no face found after the repair"
+    box = crop_box(face, before)
+    layout = layout_similarity(before.crop(box), after.crop(box))
+    if layout < limits.min_layout_similarity:
+        return False, f"layout changed: {layout:.2f} < {limits.min_layout_similarity}"
+    moved = float(np.linalg.norm(_centre(after_check.face) - _centre(face))) / face.size
+    if moved > limits.max_face_shift:
+        return False, f"face moved {moved:.2f}x its size, more than {limits.max_face_shift}x"
+    sharp_before, sharp_after = before_check.sharpness, after_check.sharpness
+    if sharp_before is not None and sharp_after is not None and sharp_after <= sharp_before:
+        return False, f"not sharper: {sharp_after:.2f} <= {sharp_before:.2f}"
+    worse = after_check.identity - before_check.identity
+    if worse > limits.identity_tolerance:
+        return False, (
+            f"less like the character: CCIP {after_check.identity:.3f} vs "
+            f"{before_check.identity:.3f}"
+        )
+    if len(after_check.failures) > len(before_check.failures):
+        return False, "more checks failed after the repair"
+    return True, (
+        f"kept: layout {layout:.2f}, face moved {moved:.2f}x, sharpness "
+        f"{sharp_before or 0:.2f} -> {sharp_after or 0:.2f}"
+    )

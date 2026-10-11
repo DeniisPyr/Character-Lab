@@ -1,0 +1,62 @@
+{
+  "side": {
+    "before": {
+      "face": [
+        95,
+        62,
+        174,
+        184
+      ],
+      "confidence": 0.819
+    },
+    "after": {
+      "face": [
+        103,
+        38,
+        177,
+        118
+      ],
+      "confidence": 0.803
+    },
+    "scores": {
+      "before": {
+        "ccip_image": 0.0202,
+        "sharpness": 0.146
+      },
+      "B": {
+        "ccip_image": 0.0249,
+        "sharpness": 0.1416
+      }
+    }
+  },
+  "three_quarter": {
+    "before": {
+      "face": [
+        78,
+        47,
+        186,
+        167
+      ],
+      "confidence": 0.86
+    },
+    "after": {
+      "face": [
+        78,
+        48,
+        186,
+        167
+      ],
+      "confidence": 0.862
+    },
+    "scores": {
+      "before": {
+        "ccip_image": 0.0081,
+        "sharpness": 0.2368
+      },
+      "B": {
+        "ccip_image": 0.0081,
+        "sharpness": 0.4196
+      }
+    }
+  }
+}

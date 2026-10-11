@@ -48,6 +48,12 @@ class QualitySettings(_Model):
     duplicate_max_bits: int = Field(ge=0, le=64)
 
 
+class FaceRepairSettings(_Model):
+    min_layout_similarity: float = Field(gt=0, le=1)
+    max_face_shift: float = Field(ge=0)
+    identity_tolerance: float = Field(ge=0)
+
+
 class CaptionSettings(_Model):
     model: str
     task: Literal["<CAPTION>", "<DETAILED_CAPTION>", "<MORE_DETAILED_CAPTION>"]
@@ -71,6 +77,7 @@ class Settings(_Model):
     prepare: PrepareSettings
     generation: GenerationSettings
     quality: QualitySettings
+    face_repair: FaceRepairSettings
     caption: CaptionSettings
 
 

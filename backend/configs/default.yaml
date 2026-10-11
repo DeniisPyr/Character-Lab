@@ -82,6 +82,16 @@ quality:
   #   shots on white differed in as few as 5 (front vs back view).
   duplicate_max_bits: 2
 
+face_repair:
+  # A repaired face replaces the original only if the image keeps its structure and gets
+  # better. Limits from a GPU experiment (2026-10-11): good repairs kept a layout similarity
+  # of 0.99-1.00 and moved the face at most 0.10x its size; a repair that drew a front face
+  # over a side profile scored 0.74 and 0.57x.
+  min_layout_similarity: 0.95
+  max_face_shift: 0.25
+  # How much worse (higher) the CCIP difference may get; small changes are noise.
+  identity_tolerance: 0.01
+
 caption:
   # Florence-2 large in transformers' own format, so no remote code runs. 1.55 GB; fast
   # enough on a CPU or a Mac too.
