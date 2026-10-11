@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # The package runs from a checkout (pip install -e), so the configs sit next to src/.
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "default.yaml"
@@ -49,9 +49,18 @@ class QualitySettings(_Model):
 
 
 class FaceRepairSettings(_Model):
+    mode: Literal["off", "failed", "small"]
+    small_below_px: int = Field(ge=1)
+    use_reference: bool
     min_layout_similarity: float = Field(gt=0, le=1)
     max_face_shift: float = Field(ge=0)
     identity_tolerance: float = Field(ge=0)
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _off(cls, value):
+        # YAML reads a bare `off` as the boolean false.
+        return "off" if value is False else value
 
 
 class CaptionSettings(_Model):

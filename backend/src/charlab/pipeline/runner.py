@@ -44,8 +44,9 @@ def run(
     in GPU memory at a time.
 
     With a quality gate, each image is checked as soon as it is made. A failed image is made
-    again with a new seed, up to `max_attempts` in all, before the next job starts, so later
-    jobs get the kept image as Picture 2.
+    again with a new seed, up to `max_attempts` in all, and a repair stage may then redraw its
+    face. All of this happens before the next job starts, so later jobs get the final image as
+    Picture 2.
 
     `on_image` gets each kept image right away, so the images already made survive a later
     crash. `after_generate` runs between generating and captioning, to free the GPU for the
@@ -54,8 +55,10 @@ def run(
     picture_1 = stages.prepare(reference)
     if stages.check:
         stages.check.start(picture_1)
+    if stages.repair:
+        stages.repair.start(picture_1)
 
-    images, attempts_by_key, kept_by_key = {}, {}, {}
+    images, attempts_by_key, kept_by_key, repairs_by_key = {}, {}, {}, {}
     for number, job in enumerate(jobs, start=1):
         missing = [key for key in job.references if key not in images]
         if missing:
@@ -83,18 +86,30 @@ def run(
                 len(attempts),
                 attempts[kept].seed,
             )
-        images[job.key] = made[kept]
+        image, repair = made[kept], None
+        if stages.repair and attempts[kept].check:
+            outcome = stages.repair(job, image, attempts[kept].check, attempts[kept].seed)
+            if outcome:
+                repair, image = outcome
+        images[job.key] = image
         attempts_by_key[job.key] = attempts
         kept_by_key[job.key] = kept
+        repairs_by_key[job.key] = repair
         log.info("generated %s (%d/%d)", job.key, number, len(jobs))
         if on_image:
-            on_image(job, made[kept])
+            on_image(job, image)
     if after_generate:
         after_generate()
 
     def result(job: Job, description: str | None) -> Result:
-        attempts = tuple(attempts_by_key[job.key])
-        return Result(job, images[job.key], description, attempts, kept_by_key[job.key])
+        return Result(
+            job,
+            images[job.key],
+            description,
+            attempts=tuple(attempts_by_key[job.key]),
+            kept=kept_by_key[job.key],
+            repair=repairs_by_key[job.key],
+        )
 
     if stages.caption is None:
         return [result(job, None) for job in jobs]

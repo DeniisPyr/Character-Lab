@@ -83,6 +83,17 @@ quality:
   duplicate_max_bits: 2
 
 face_repair:
+  # Which faces get redrawn with the generator, right after the quality gate:
+  # - failed: only faces that still fail the gate after every attempt (the safe default;
+  #   in our runs every image passed, so it rarely runs)
+  # - small: also faces whose shorter side is below small_below_px, even if they passed
+  # - off: never
+  mode: failed
+  small_below_px: 128
+  # Give the generator a close-up of the reference's face as Picture 2, to anchor the face.
+  # With a front-facing reference, a repair once drew a front face over a side profile; the
+  # checks below rejected it.
+  use_reference: true
   # A repaired face replaces the original only if the image keeps its structure and gets
   # better. Limits from a GPU experiment (2026-10-11): good repairs kept a layout similarity
   # of 0.99-1.00 and moved the face at most 0.10x its size; a repair that drew a front face

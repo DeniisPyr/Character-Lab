@@ -7,13 +7,16 @@ import pytest
 from PIL import Image
 
 from charlab.config import load_settings
+from charlab.pipeline import repair as repair_module
 from charlab.pipeline.faces import Face
-from charlab.pipeline.jobs import Check
+from charlab.pipeline.jobs import Check, Job
 from charlab.pipeline.repair import (
     PROMPT,
     REFERENCE_PROMPT,
+    REPAIR_SEED_STEP,
     REPAIR_SIZE,
     FaceRepairer,
+    FaceRepairStage,
     blend,
     crop_box,
     keep_repair,
@@ -155,3 +158,69 @@ def test_a_repair_that_is_not_better_is_rejected(change, reason):
 
     assert not keep
     assert why.startswith(reason)
+
+
+FRONT = Job("turnaround/front", "A.", (1280, 720), 42, ())
+BACK = Job("turnaround/back", "B.", (1280, 720), 43, (), face=False)
+GOOD = Check(0.01, FACE, 0.3)  # FACE is 100 px
+
+
+class FakeGate:
+    def __init__(self, faces=(FACE,)):
+        self.faces, self.checked = list(faces), []
+
+    def detect(self, image):
+        return self.faces
+
+    def __call__(self, job, image):
+        self.checked.append(image)
+        return Check(0.01, FACE, 0.5)
+
+
+def stage(mode="failed", use_reference=True, gate=None):
+    settings = LIMITS.model_copy(update={"mode": mode, "use_reference": use_reference})
+    return FaceRepairStage(settings, FakeGenerate(), gate or FakeGate())
+
+
+@pytest.mark.parametrize(
+    ("mode", "job", "check", "repair"),
+    [
+        ("failed", FRONT, GOOD, False),
+        ("failed", FRONT, replace(GOOD, failures=("too blurry",)), True),
+        ("failed", FRONT, Check(0.5, None, None, ("no face found",)), False),
+        ("failed", BACK, replace(GOOD, failures=("x",)), False),
+        ("small", FRONT, GOOD, True),  # 100 px < 128
+        ("small", FRONT, replace(GOOD, face=Face((0, 0, 200, 200), 0.9)), False),
+        ("off", FRONT, replace(GOOD, failures=("too blurry",)), False),
+    ],
+    ids=["passed", "failed", "no face to repair", "shot from behind", "small face",
+         "big face", "off"],
+)  # fmt: skip
+def test_which_faces_get_repaired(mode, job, check, repair):
+    assert stage(mode).needs_repair(job, check) is repair
+
+
+def test_the_face_reference_is_cut_from_the_reference():
+    with_reference, without = stage(), stage(use_reference=False)
+
+    with_reference.start(IMAGE)
+    without.start(IMAGE)
+
+    assert with_reference._reference.size == (220, 220)
+    assert without._reference is None
+
+
+@pytest.mark.parametrize("keep", [True, False])
+def test_a_repair_is_checked_and_kept_only_if_the_guard_agrees(monkeypatch, keep):
+    monkeypatch.setattr(repair_module, "keep_repair", lambda *args: (keep, "because"))
+    gate = FakeGate()
+    repairer = stage(gate=gate)
+    repairer.start(IMAGE)
+
+    repair, image = repairer(FRONT, IMAGE, replace(GOOD, failures=("too blurry",)), seed=42)
+
+    assert (repair.seed, repair.kept, repair.reason) == (42 + REPAIR_SEED_STEP, keep, "because")
+    assert repair.check.sharpness == 0.5
+    assert len(gate.checked) == 1
+    assert (image is IMAGE) is not keep
+    assert repairer.repairer.generate.calls[0][1] == [(1024, 1024), (220, 220)]

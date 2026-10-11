@@ -72,11 +72,28 @@ class FakeGate:
         return Check(0.01)
 
 
+class FakeRepair:
+    """Never repairs; records that the CLI created it."""
+
+    created = []
+
+    def __init__(self, settings, generate, gate):
+        FakeRepair.created.append(settings.mode)
+
+    def start(self, reference):
+        pass
+
+    def __call__(self, job, image, check, seed):
+        return None
+
+
 @pytest.fixture
 def fake_models(monkeypatch):
     monkeypatch.setattr(cli, "QwenGenerator", FakeGenerator)
     monkeypatch.setattr(cli, "FlorenceCaptioner", FakeCaptioner)
     monkeypatch.setattr(cli, "QualityGate", FakeGate)
+    monkeypatch.setattr(cli, "FaceRepairStage", FakeRepair)
+    monkeypatch.setattr(FakeRepair, "created", [])
     monkeypatch.setattr(FakeGate, "fail_first_front", False)
 
 
@@ -106,6 +123,7 @@ def test_dry_run_prints_the_plan(capsys, reference):
     assert "Show the character's full body standing upright" in out
     assert "caption: mychar, full body, front view, standing, plain white background." in out
     assert "quality:   anime checks, up to 3 attempts per image" in out
+    assert "repair:    failed faces" in out
 
 
 def test_dry_run_uses_description_out_and_config(capsys, reference, tmp_path):
@@ -232,3 +250,14 @@ def test_trigger_is_required(reference):
         main(["generate", reference, "--dry-run"])
 
     assert exc.value.code == 2
+
+
+def test_face_repair_runs_unless_switched_off(fake_models, reference, tmp_path):
+    off = tmp_path / "off.yaml"
+    off.write_text("face_repair:\n  mode: off\n", encoding="utf-8")
+
+    assert main(["generate", reference, "--trigger", "a", "--out", str(tmp_path / "a")]) == 0
+    assert main(["generate", reference, "--trigger", "b", "--out", str(tmp_path / "b"),
+                 "--config", str(off)]) == 0  # fmt: skip
+
+    assert FakeRepair.created == ["failed"]

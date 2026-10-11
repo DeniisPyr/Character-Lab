@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Protocol
 from PIL import Image
 
 if TYPE_CHECKING:
-    from charlab.pipeline.jobs import Check, Job
+    from charlab.pipeline.jobs import Check, Job, Repair
 
 
 class StageUnavailable(RuntimeError):
@@ -39,6 +39,16 @@ class Gate(Protocol):
         """Score one generated image against the reference."""
 
 
+class FaceRepair(Protocol):
+    def start(self, reference: Image.Image) -> None:
+        """Prepare the face reference from the prepared reference, once per run."""
+
+    def __call__(
+        self, job: "Job", image: Image.Image, check: "Check", seed: int
+    ) -> tuple["Repair", Image.Image] | None:
+        """Repair the image's face if it needs it: the repair and the image to use."""
+
+
 class Caption(Protocol):
     def __call__(self, image: Image.Image) -> str:
         """Describe the image for the training caption."""
@@ -52,3 +62,5 @@ class Stages:
     caption: Caption | None = None
     # Without a quality gate, every image is kept as generated.
     check: Gate | None = None
+    # Without a repair stage, faces are never redrawn.
+    repair: FaceRepair | None = None
