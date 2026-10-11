@@ -56,6 +56,14 @@ quality:
   # The model's F1-optimal confidence. It found one face in each of 15 generated images, at
   # 0.79-0.86, and none in the back view.
   face_confidence: 0.307
+  # Anime identity: CCIP from DeepGHS (OpenRAIL), a feature model (150 MB) and the small model
+  # that compares two features. It compares whole images, so it works on the back view too.
+  ccip_features:
+    repo: deepghs/ccip_onnx
+    file: ccip-caformer-24-randaug-pruned/model_feat.onnx
+  ccip_metric:
+    repo: deepghs/ccip_onnx
+    file: ccip-caformer-24-randaug-pruned/model_metrics.onnx
 
 caption:
   # Florence-2 large in transformers' own format, so no remote code runs. 1.55 GB; fast
