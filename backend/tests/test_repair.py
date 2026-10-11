@@ -1,7 +1,14 @@
+import json
+from dataclasses import replace
+from pathlib import Path
+
+import numpy as np
 import pytest
 from PIL import Image
 
+from charlab.config import load_settings
 from charlab.pipeline.faces import Face
+from charlab.pipeline.jobs import Check
 from charlab.pipeline.repair import (
     PROMPT,
     REFERENCE_PROMPT,
@@ -9,6 +16,8 @@ from charlab.pipeline.repair import (
     FaceRepairer,
     blend,
     crop_box,
+    keep_repair,
+    layout_similarity,
     oval_mask,
 )
 
@@ -83,3 +92,66 @@ def test_a_face_reference_becomes_picture_2():
     prompt, sizes, _, _ = generate.calls[0]
     assert prompt == PROMPT + REFERENCE_PROMPT
     assert sizes == [(1024, 1024), (400, 400)]
+
+
+# Real repairs from the GPU experiment (2026-10-11), cropped around the face: a side profile
+# that the repair turned into a front face, and a three-quarter view it sharpened.
+FIXTURES = Path(__file__).parent / "fixtures" / "repair"
+FACES = json.loads((FIXTURES / "faces.json").read_text("utf-8"))
+LIMITS = load_settings().face_repair
+
+
+def real_repair(case):
+    data = FACES[case]
+    images, checks = [], []
+    for label, scores in (("before", "before"), ("after", "B")):
+        images.append(Image.open(FIXTURES / f"{case}_{label}.png").convert("RGB"))
+        face = Face(tuple(data[label]["face"]), data[label]["confidence"])
+        score = data["scores"][scores]
+        checks.append(Check(score["ccip_image"], face, score["sharpness"]))
+    return (*images, *checks)
+
+
+def test_layout_ignores_fine_detail_but_not_the_layout():
+    before, after, *_ = real_repair("three_quarter")
+    noise = np.random.default_rng(0).integers(-20, 21, (*before.size[::-1], 3))
+    noisy = Image.fromarray(np.clip(np.asarray(before, int) + noise, 0, 255).astype(np.uint8))
+
+    assert layout_similarity(before, before) == pytest.approx(1.0)
+    assert layout_similarity(before, noisy) > 0.99
+    assert layout_similarity(before, before.transpose(Image.FLIP_TOP_BOTTOM)) < 0.5
+
+
+def test_a_front_face_drawn_over_a_side_profile_is_rejected():
+    # Its identity score even improved: only the structure check catches it.
+    keep, reason = keep_repair(*real_repair("side"), LIMITS)
+
+    assert not keep
+    assert reason.startswith("layout changed: 0.7")
+
+
+def test_a_sharper_face_in_the_same_pose_is_kept():
+    keep, reason = keep_repair(*real_repair("three_quarter"), LIMITS)
+
+    assert keep
+    assert reason == "kept: layout 1.00, face moved 0.00x, sharpness 0.24 -> 0.42"
+
+
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        ({"face": None}, "no face found after the repair"),
+        ({"face": Face((118, 47, 226, 167), 0.86)}, "face moved 0.37x its size"),
+        ({"sharpness": 0.2}, "not sharper: 0.20 <= 0.24"),
+        ({"identity": 0.03}, "less like the character: CCIP 0.030 vs 0.008"),
+        ({"failures": ("face 40 px, smaller than 64 px",)}, "more checks failed"),
+    ],
+    ids=["no face", "face moved", "not sharper", "identity worse", "more failures"],
+)
+def test_a_repair_that_is_not_better_is_rejected(change, reason):
+    before, after, before_check, after_check = real_repair("three_quarter")
+
+    keep, why = keep_repair(before, after, before_check, replace(after_check, **change), LIMITS)
+
+    assert not keep
+    assert why.startswith(reason)
