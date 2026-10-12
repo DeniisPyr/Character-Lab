@@ -5,11 +5,15 @@ redraws it, with the crop as Picture 1 and, optionally, a face reference as Pict
 result is shrunk back and blended in through a soft oval over the face, so nothing else in
 the image changes.
 
-In a GPU experiment (2026-10-11), this approach restored deliberately blurred faces (face
+In GPU experiments (2026-10-11/12), this approach restored deliberately blurred faces (face
 sharpness 0.01 → 0.60 of the reference's) and sharpened small real faces. Qwen's inpainting
 pipeline and an anime SDXL model did neither. It can also replace the pose: with a
 front-facing reference it drew a front face over a side profile. So a repair is a candidate
 only: it has to be checked before it replaces the original.
+
+The checks do not cover fine facial features: repairs widened the eyes, lightened the irises
+and thickened the brows while CCIP still scored the same character. Face repair is therefore
+off by default, and is meant for faces that are broken anyway.
 """
 
 import logging

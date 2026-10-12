@@ -123,7 +123,7 @@ def test_dry_run_prints_the_plan(capsys, reference):
     assert "Show the character's full body standing upright" in out
     assert "caption: mychar, full body, front view, standing, plain white background." in out
     assert "quality:   anime checks, up to 3 attempts per image" in out
-    assert "repair:    failed faces" in out
+    assert "repair:    off" in out
 
 
 def test_dry_run_uses_description_out_and_config(capsys, reference, tmp_path):
@@ -197,7 +197,7 @@ def test_real_run_writes_the_captioned_dataset(capsys, fake_models, reference, t
     manifest = json.loads((out / "manifest.json").read_text("utf-8"))
     assert (manifest["trigger"], manifest["reference"]) == ("mychar", "ref.png")
     assert manifest["generation"]["transformer"] == "bf16"
-    assert manifest["face_repair"]["mode"] == "failed"
+    assert manifest["face_repair"]["mode"] == "off"
     assert len(manifest["images"]) == 16
     printed = capsys.readouterr().out
     assert f"saved 16 images with captions to {out}" in printed
@@ -253,12 +253,12 @@ def test_trigger_is_required(reference):
     assert exc.value.code == 2
 
 
-def test_face_repair_runs_unless_switched_off(fake_models, reference, tmp_path):
-    off = tmp_path / "off.yaml"
-    off.write_text("face_repair:\n  mode: off\n", encoding="utf-8")
+def test_face_repair_runs_only_when_switched_on(fake_models, reference, tmp_path):
+    on = tmp_path / "on.yaml"
+    on.write_text("face_repair:\n  mode: failed\n", encoding="utf-8")
 
     assert main(["generate", reference, "--trigger", "a", "--out", str(tmp_path / "a")]) == 0
     assert main(["generate", reference, "--trigger", "b", "--out", str(tmp_path / "b"),
-                 "--config", str(off)]) == 0  # fmt: skip
+                 "--config", str(on)]) == 0  # fmt: skip
 
     assert FakeRepair.created == ["failed"]

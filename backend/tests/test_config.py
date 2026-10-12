@@ -19,6 +19,7 @@ def test_defaults_load():
     assert (settings.generation.steps, settings.generation.cfg) == (4, 1.0)
     assert settings.prepare.background_model == "birefnet-general"
     assert settings.generation.transformer == "bf16"
+    assert (settings.face_repair.mode, settings.face_repair.use_reference) == ("off", True)
 
 
 def test_default_recipe_exists_and_is_valid():
