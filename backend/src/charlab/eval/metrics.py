@@ -1,5 +1,5 @@
-"""Score a finished dataset against the reference: is it one character, and are the faces good
-and varied?
+"""Score a finished dataset: is it one character, are the faces good, is it varied, and are the
+captions ready for training?
 
 It uses the quality gate's models (CCIP and the anime face detector) on the CPU, and works on
 any folder of image/caption pairs, including one made by another tool.
@@ -10,14 +10,19 @@ whole-image difference from 0.008 to 0.042, and the face's from 0.006 to 0.202.
 """
 
 import logging
+import re
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
+from itertools import combinations
+from typing import Any
 
 import numpy as np
 from PIL import Image
 
 from charlab.config import QualitySettings
 from charlab.eval.dataset import Dataset
+from charlab.pipeline.caption import needs_cleaning
 from charlab.pipeline.faces import Face, FaceDetector
 from charlab.pipeline.identity import Ccip
 from charlab.pipeline.quality import face_crop, fingerprint, sharpness
@@ -107,3 +112,72 @@ class Scorer:
             if reference_sharpness:
                 relative[i] = sharpness(images[i], faces[i]) / reference_sharpness
         return identity, relative
+
+
+def summarise(scores: Scores, same_character_below: float) -> dict[str, Any]:
+    """The dataset in numbers: each score's mean and its worst image or pair, and counts.
+
+    None stands for a score with nothing to measure, such as face sizes when no face was found.
+    """
+    images = scores.images
+    names = [image.name for image in images]
+    faces = {image.name: image.face.size for image in images if image.face}
+    return {
+        "images": len(images),
+        "identity": {
+            **_spread({image.name: image.identity for image in images}, max),
+            "same_character": sum(image.identity < same_character_below for image in images),
+        },
+        "face_identity": _spread(_known(images, "face_identity"), max),
+        "consistency": _pairs(scores.consistency, names, max),
+        "faces": {"found": len(faces), "missing": [name for name in names if name not in faces]},
+        "face_size": _spread(faces, min),
+        "sharpness": _spread(_known(images, "sharpness"), min),
+        # Different fingerprint bits: the closest pair is the most alike.
+        "diversity": _pairs(scores.different_bits, names, min),
+        "sizes": dict(Counter(f"{width}x{height}" for width, height in (i.size for i in images))),
+        "captions": _captions(images, scores.orphans),
+    }
+
+
+def _known(images: tuple[ImageScore, ...], score: str) -> dict[str, float]:
+    return {i.name: getattr(i, score) for i in images if getattr(i, score) is not None}
+
+
+def _spread(
+    values: dict[Any, float], worst: Callable, label: str = "worst_image"
+) -> dict[str, Any] | None:
+    """The mean, and the worst value with its image or pair; None when there are no values."""
+    if not values:
+        return None
+    key = worst(values, key=values.__getitem__)
+    mean = sum(values.values()) / len(values)
+    return {"mean": round(mean, 4), "worst": round(values[key], 4), label: key}
+
+
+def _pairs(matrix: np.ndarray, names: list[str], worst: Callable) -> dict[str, Any] | None:
+    """`_spread` over every pair of images."""
+    pairs = {(a, b): matrix[i, j].item() for (i, a), (j, b) in combinations(enumerate(names), 2)}
+    spread = _spread(pairs, worst, label="worst_pair")
+    return spread and {**spread, "worst_pair": list(spread["worst_pair"])}
+
+
+def _captions(images: tuple[ImageScore, ...], orphans: tuple[str, ...]) -> dict[str, Any]:
+    """What a trainer gets: is every image captioned, and does every caption start with the
+    same trigger word, stay short enough and leave out the character's fixed look?"""
+    captions = {image.name: image.caption for image in images if image.caption}
+    first_words = Counter(re.split(r"[\s,.]", text, maxsplit=1)[0] for text in captions.values())
+    trigger, with_trigger = first_words.most_common(1)[0] if first_words else (None, 0)
+    words = [len(text.split()) for text in captions.values()]
+    return {
+        "captioned": len(captions),
+        "missing": [image.name for image in images if not image.caption],
+        "orphans": list(orphans),
+        "trigger": trigger,
+        "with_trigger": with_trigger,
+        "words": {"min": min(words), "mean": round(sum(words) / len(words), 1), "max": max(words)}
+        if words
+        else None,
+        "distinct": len(set(captions.values())),
+        "need_cleaning": [name for name, text in captions.items() if needs_cleaning(text)],
+    }
