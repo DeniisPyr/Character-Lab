@@ -17,7 +17,8 @@ captions each one, and writes them as image/caption pairs ready for a LoRA train
 
 > **Status: work in progress.** The full pipeline works and is tested on a GPU: preparing the
 > reference, generating, checking quality, captioning and exporting the dataset. Face repair
-> and evaluation come next.
+> is included but experimental and off by default (see
+> [Face repair](#face-repair-experimental)). Evaluation comes next.
 
 ## How it works
 
@@ -33,7 +34,8 @@ captions each one, and writes them as image/caption pairs ready for a LoRA train
    The Lightning LoRA cuts sampling to 4 steps. Each image is saved as soon as it is made.
 3. **Check.** A quality gate scores each image as soon as it is made: is it the same
    character, and is the face there, big enough and sharp? A failed image is made again with
-   a new seed (see [Quality gate](#quality-gate)).
+   a new seed (see [Quality gate](#quality-gate)). An experimental face repair, off by
+   default, can then redraw a face that still fails.
 4. **Caption.** The generator frees the GPU, then
    [Florence-2](https://huggingface.co/florence-community/Florence-2-large) describes each
    image. The caption is the trigger word, then tags from the recipe, then the cleaned
@@ -225,6 +227,71 @@ can only catch true copies.
 [backend/configs/default.yaml](backend/configs/default.yaml). The models suit anime and
 illustrated characters (`style: anime`, the only style so far). A realistic style with its
 own detector and identity model is planned.
+
+## Face repair (experimental)
+
+Off by default. Switched on, it redraws a weak face with the same Qwen model, right after the
+quality gate and before the next image is made.
+
+**How it works:**
+1. The face is cut out at 2.2× its size and scaled to 1024 px, so the model sees a close-up.
+2. The model redraws the close-up (Picture 1): the same framing, head angle, pose,
+   expression, hair and lighting, with sharper detail in the face. A close-up of the
+   reference's face goes in as Picture 2.
+3. The result is scaled back and blended in through a soft oval over the face. Nothing
+   outside the oval changes.
+4. The repaired image goes through the gate again. It replaces the original only if:
+
+| Check | Limit |
+|---|---|
+| Layout (16×16 greyscale thumbnails, correlation) | at least 0.95 |
+| Face position | moved at most 0.25× the face's size |
+| Face sharpness | higher than before |
+| CCIP difference | at most 0.01 worse than before |
+| Gate failures | none added |
+
+`report.json` records every repair, kept or rejected, with the reason.
+
+**To switch it on**, set the mode in a config passed with `--config`:
+
+```yaml
+face_repair:
+  mode: failed   # faces that fail every attempt; `small` also redraws faces under 128 px
+```
+
+**What was measured.** Three methods were compared on a GPU. Qwen's inpainting pipeline and
+an anime SDXL model did not restore a blurred face, so this edit-a-close-up method was
+chosen. It was then tested on faces from a real run, damaged on purpose. The table compares
+repairs with the reference's face as Picture 2 (`use_reference: true`, the default) and
+without it. The face-crop CCIP compares the face alone with the reference's face; the gate's
+whole-image CCIP barely reacts to the face.
+
+| Face | Sharpness: before → with / without reference | Face-crop CCIP: before → with / without reference |
+|---|---|---|
+| Front view, undamaged | 0.24 | 0.006 |
+| Front view, shrunk to 1/8 and enlarged back | 0.01 → 0.39 / 0.42 | 0.202 → 0.004 / 0.020 |
+| Front view, JPEG at quality 8 | 0.16 → 0.25 / 0.38 | 0.113 → 0.025 / 0.034 |
+| Hilltop scene, undamaged | 0.29 | 0.016 |
+| Hilltop scene, shrunk to 1/8 and enlarged back | 0.05 → 0.23 / 0.45 | 0.154 → 0.015 / 0.028 |
+| Hilltop scene, JPEG at quality 8 | 0.22 → 0.26 / 0.43 | 0.063 → 0.010 / 0.016 |
+
+By these numbers every repair is a success, and the guard kept all of them.
+
+**Why it is off by default:**
+- **It changes fine facial features, and no check can see it.** Without the reference, the
+  repairs opened the heavy-lidded brown eyes wider, turned the irises grey-green and drew
+  thicker, darker brows. With the reference, the eyes stayed closer, but on the JPEG face the
+  hair inside the oval turned near-black. CCIP still scored every one as the same
+  character, and sharpness even rose. A LoRA trained on such faces learns a slightly
+  different face.
+- **The reference pulls side views to the front.** With it, side profiles came back closer
+  to a front face (layout 0.77–0.81), so the guard rejected them.
+- **It rarely has anything to do.** In every full run, all 16 images passed the gate, so
+  `failed` mode never ran.
+- **The gate misses blocky faces.** JPEG block edges count as detail: the front face at
+  quality 8 scored 0.16× sharpness, above the 0.07× limit, so `failed` mode never sees it.
+  The face-crop CCIP does react (0.113 vs 0.006 clean); calibrating it as a check needs more
+  characters.
 
 ## Development
 
