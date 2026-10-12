@@ -1,0 +1,26 @@
+# A plan for `charlab ablate`: which settings to compare, on which characters. Each run makes
+# a full 16-image dataset, so it takes about as much GPU time as `charlab generate`.
+
+# Each variant changes the default settings (`settings`, in the shape of default.yaml), or
+# stops passing earlier images as Picture 2 (`chain: false`). The first variant is the
+# baseline that the others are compared with.
+variants:
+  baseline: {}
+  # Only the seed changes, which shows how much the scores move by chance.
+  seed_43:
+    settings: {seed: 43}
+  # The 24 GB mode.
+  gguf:
+    settings: {generation: {transformer: gguf}}
+  # Every view from the reference alone.
+  no_chain:
+    chain: false
+  # The reference used as it is: no background removal, no crop.
+  uncropped:
+    settings: {prepare: {background: keep}}
+
+# Which characters get which variants. A character is a reference image in the --references
+# folder, named by its file name without the extension; `all` means every one.
+runs:
+  - characters: all
+    variants: [baseline, seed_43, gguf, no_chain, uncropped]
