@@ -111,9 +111,14 @@ def _read(path: Path) -> dict:
 
 
 def load_settings(
-    override: str | Path | None = None, defaults: str | Path = DEFAULT_CONFIG
+    override: str | Path | None = None,
+    defaults: str | Path = DEFAULT_CONFIG,
+    changes: dict | None = None,
 ) -> Settings:
+    """The defaults, then the `override` file, then `changes` (a dict in the same shape)."""
     data = _read(Path(defaults))
     if override is not None:
         data = merge(data, _read(Path(override)))
+    if changes:
+        data = merge(data, changes)
     return Settings.model_validate(data)

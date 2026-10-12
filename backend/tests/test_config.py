@@ -37,6 +37,15 @@ def test_override_changes_only_what_it_sets(tmp_path):
     assert settings.seed == 42
 
 
+def test_changes_apply_after_the_override_file(tmp_path):
+    override = write(tmp_path, "seed: 7\ngeneration:\n  steps: 8\n")
+
+    settings = load_settings(override, changes={"generation": {"transformer": "gguf"}})
+
+    assert (settings.seed, settings.generation.steps) == (7, 8)
+    assert settings.generation.transformer == "gguf"
+
+
 def test_empty_override_keeps_defaults(tmp_path):
     assert load_settings(write(tmp_path, "")) == load_settings()
 
