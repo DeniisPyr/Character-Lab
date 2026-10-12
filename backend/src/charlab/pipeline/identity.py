@@ -6,7 +6,7 @@ into a difference: low for the same character. Preprocessing follows dghs-imguti
 (MIT, imgutils/metrics/ccip.py).
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import numpy as np
@@ -49,7 +49,11 @@ class Ccip:
 
     def difference(self, a: np.ndarray, b: np.ndarray) -> float:
         """How different two characters look: below about 0.18, CCIP sees the same one."""
+        return float(self.differences([a, b])[0, 1])
+
+    def differences(self, features: Sequence[np.ndarray]) -> np.ndarray:
+        """Every pair's difference in one run of the metric model: (N, N) for N features."""
         if self._metric is None:
             self._metric = self._load(self.settings.ccip_metric)
-        (output,) = self._metric.run(["output"], {"input": np.stack([a, b]).astype(np.float32)})
-        return float(output[0, 1])
+        (output,) = self._metric.run(["output"], {"input": np.stack(features).astype(np.float32)})
+        return output
