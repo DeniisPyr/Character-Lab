@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-import re
 import sys
 import textwrap
 from collections.abc import Sequence
@@ -11,20 +10,18 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from charlab import __version__
-from charlab.config import Settings, load_settings
+from charlab.config import load_settings
 from charlab.eval.dataset import InvalidDataset, load_dataset
 from charlab.eval.metrics import Scorer, summarise
 from charlab.eval.report import write_eval
-from charlab.make import make_dataset
-from charlab.pipeline.caption import FlorenceCaptioner, build_caption
+from charlab.make import make_dataset, run_record
+from charlab.pipeline.caption import TRIGGER, FlorenceCaptioner, build_caption
 from charlab.pipeline.export import Export
 from charlab.pipeline.generate import QwenGenerator
 from charlab.pipeline.jobs import Job, plan
 from charlab.pipeline.prepare import InvalidReference, load_reference, prepare_reference
 from charlab.pipeline.stages import StageUnavailable
-from charlab.recipe import Recipe, load_recipe
-
-TRIGGER = re.compile(r"^[A-Za-z0-9_-]+$")
+from charlab.recipe import load_recipe
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -83,23 +80,6 @@ def format_plan(jobs: Sequence[Job], header: Sequence[str], trigger: str) -> str
     return "\n".join(lines)
 
 
-def _run_record(args: argparse.Namespace, settings: Settings, recipe: Recipe) -> dict:
-    """What the manifest records about the run, enough to repeat it."""
-    return {
-        "charlab": __version__,
-        "reference": args.reference.name,
-        "recipe": recipe.name,
-        "seed": settings.seed,
-        "description": args.description,
-        "prepare": settings.prepare.model_dump(),
-        "style": settings.style,
-        "generation": settings.generation.model_dump(),
-        "quality": settings.quality.model_dump(),
-        "face_repair": settings.face_repair.model_dump(),
-        "captioning": settings.caption.model_dump(),
-    }
-
-
 def _error(message: str, command: str = "generate") -> int:
     print(f"charlab {command}: error: {message}", file=sys.stderr)
     return 2
@@ -145,7 +125,7 @@ def _generate(args: argparse.Namespace) -> int:
             settings,
             QwenGenerator(settings.generation),
             FlorenceCaptioner(settings.caption),
-            _run_record(args, settings, recipe),
+            run_record(args.reference, args.description, settings, recipe),
         )
     except (InvalidReference, StageUnavailable) as error:
         return _error(str(error))

@@ -36,6 +36,8 @@ _HAIR_CLAUSE = re.compile(
     re.IGNORECASE,
 )
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+# The trigger word that starts every caption: one word of letters, digits, _ or -.
+TRIGGER = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _sentences(text: str) -> list[str]:
