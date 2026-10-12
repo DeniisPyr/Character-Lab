@@ -8,6 +8,7 @@ from PIL import Image
 
 from charlab import __version__, cli, make
 from charlab.cli import main
+from charlab.config import DEFAULT_CONFIG
 from charlab.eval.metrics import ImageScore, Scores
 from charlab.pipeline.faces import Face
 from charlab.pipeline.jobs import Check
@@ -312,3 +313,34 @@ def test_eval_reports_a_missing_dataset_or_reference(capsys, reference, tmp_path
     Image.new("RGB", (64, 64)).save(data / "001.png")
     assert main(["eval", str(data), "--reference", "nope.png"]) == 2
     assert "nope.png: not found" in capsys.readouterr().err
+
+
+def test_ablate_dry_run_lists_the_runs(capsys, reference, tmp_path):
+    references = tmp_path / "refs"
+    references.mkdir()
+    Image.open(reference).save(references / "anna.png")
+    (tmp_path / "out/anna/baseline").mkdir(parents=True)
+    (tmp_path / "out/anna/baseline/report.json").write_text("{}", encoding="utf-8")
+
+    code = main(
+        [
+            "ablate", "--plan", str(DEFAULT_CONFIG.parent / "ablation.yaml"),
+            "--references", str(references),
+            "--out", str(tmp_path / "out"), "--dry-run",
+        ]
+    )  # fmt: skip
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "5 datasets, compared with 'baseline':" in out
+    assert "  anna/baseline: defaults (made)" in out
+    assert '  anna/gguf: {"generation": {"transformer": "gguf"}}' in out
+    assert "  anna/no_chain: defaults, no earlier images as Picture 2" in out
+
+
+def test_ablate_reports_a_bad_plan(capsys, tmp_path):
+    plan = tmp_path / "plan.yaml"
+    plan.write_text("variants: [oops\n", encoding="utf-8")
+
+    assert main(["ablate", "--plan", str(plan), "--references", str(tmp_path)]) == 2
+    assert capsys.readouterr().err.startswith("charlab ablate: error:")
