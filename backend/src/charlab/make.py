@@ -6,6 +6,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from charlab import __version__
 from charlab.config import Settings
 from charlab.pipeline.export import Export
 from charlab.pipeline.generate import QwenGenerator
@@ -15,6 +16,26 @@ from charlab.pipeline.quality import QualityGate
 from charlab.pipeline.repair import FaceRepairStage
 from charlab.pipeline.runner import run
 from charlab.pipeline.stages import Caption, Stages
+from charlab.recipe import Recipe
+
+
+def run_record(
+    reference: Path, description: str | None, settings: Settings, recipe: Recipe
+) -> dict[str, Any]:
+    """What the manifest records about the run, enough to repeat it."""
+    return {
+        "charlab": __version__,
+        "reference": reference.name,
+        "recipe": recipe.name,
+        "seed": settings.seed,
+        "description": description,
+        "prepare": settings.prepare.model_dump(),
+        "style": settings.style,
+        "generation": settings.generation.model_dump(),
+        "quality": settings.quality.model_dump(),
+        "face_repair": settings.face_repair.model_dump(),
+        "captioning": settings.caption.model_dump(),
+    }
 
 
 def make_dataset(
