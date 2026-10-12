@@ -126,7 +126,7 @@ def summarise(scores: Scores, same_character_below: float) -> dict[str, Any]:
         "images": len(images),
         "identity": {
             **_spread({image.name: image.identity for image in images}, max),
-            "same_character": sum(image.identity < same_character_below for image in images),
+            "same_character": int(sum(image.identity < same_character_below for image in images)),
         },
         "face_identity": _spread(_known(images, "face_identity"), max),
         "consistency": _pairs(scores.consistency, names, max),
