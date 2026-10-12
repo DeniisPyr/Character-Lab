@@ -18,7 +18,8 @@ captions each one, and writes them as image/caption pairs ready for a LoRA train
 > **Status: work in progress.** The full pipeline works and is tested on a GPU: preparing the
 > reference, generating, checking quality, captioning and exporting the dataset. Face repair
 > is included but experimental and off by default (see
-> [Face repair](#face-repair-experimental)). Evaluation comes next.
+> [Face repair](#face-repair-experimental)). A second command scores a finished dataset (see
+> [Evaluation](#evaluation)). Comparing settings across several characters comes next.
 
 ## How it works
 
@@ -48,6 +49,9 @@ captions each one, and writes them as image/caption pairs ready for a LoRA train
 5. **Export.** Numbered image/caption pairs, a `manifest.json` and a `report.json` (see
    [Output](#output)).
 
+A separate command, `charlab eval`, scores a finished dataset on the CPU (see
+[Evaluation](#evaluation)).
+
 Every image has its own seed, so a run is reproducible: the same reference, seed and
 settings give byte-identical images on the same GPU model and torch CUDA build. Repeat runs on
 three A100 machines with CUDA 13 matched exactly. An A100 with the CUDA 12.6 build gave close
@@ -60,6 +64,7 @@ diffusion amplifies that.
 | What you want to do | What you need |
 |---|---|
 | Install, run the tests, print the plan (`--dry-run`) | Python 3.11+ on Linux, macOS or Windows |
+| Score a finished dataset (`charlab eval`) | The same, no GPU. About 200 MB of models, more if the reference's background needs removing |
 | Generate images | An NVIDIA GPU, plus disk space for the models (see below) |
 
 Generation has two modes, set with `generation.transformer`:
@@ -84,7 +89,8 @@ Generation has two modes, set with `generation.transformer`:
   48 GB of RAM. This is an estimate, not yet measured on a home PC.
 
 Generation is tested on Linux. Windows with an NVIDIA GPU should work, but is untested. Macs
-have no NVIDIA GPU, so they can run only the dry run and the tests.
+have no NVIDIA GPU, so they can run the dry run, the tests and `charlab eval`, but not
+generation.
 
 ## Install
 
@@ -95,7 +101,8 @@ git clone https://github.com/DeniisPyr/Character-Lab.git
 cd Character-Lab
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e './backend[gpu]'     # or './backend' for the dry run and tests only
+pip install -e './backend[gpu]'     # everything, on a machine with an NVIDIA GPU
+# or './backend[eval]' to only score datasets, or './backend' for the dry run and tests
 ```
 
 Windows (PowerShell):
@@ -127,6 +134,9 @@ charlab generate path/to/reference.png --trigger mychar --dry-run
 
 # Generate and caption the dataset into results/mychar/
 charlab generate path/to/reference.png --trigger mychar
+
+# Score the dataset; writes eval.json and eval.md into results/mychar/
+charlab eval results/mychar --reference path/to/reference.png
 ```
 
 Options:
@@ -292,6 +302,51 @@ By these numbers every repair is a success, and the guard kept all of them.
   quality 8 scored 0.16× sharpness, above the 0.07× limit, so `failed` mode never sees it.
   The face-crop CCIP does react (0.113 vs 0.006 clean); calibrating it as a check needs more
   characters.
+
+## Evaluation
+
+`charlab eval` scores a finished dataset against its reference. It runs on the CPU with the
+quality gate's models, in about 15 seconds for 16 images on a Mac. It reads any folder of
+image/caption pairs, so it can also compare runs, settings, or datasets made with other tools.
+It writes `eval.json` (every number) and `eval.md` (the same as tables) into the folder.
+
+| Score | What it measures | Better |
+|---|---|---|
+| Identity | CCIP difference between each image and the reference, as in the quality gate | lower |
+| Face identity | CCIP difference between each face, cut out, and the reference's face | lower |
+| Consistency | CCIP difference between every two images of the dataset | lower |
+| Face size and sharpness | as in the quality gate | higher |
+| Diversity | how many of 64 fingerprint bits differ between two images | higher |
+| Captions | missing captions, captions without an image, the trigger word, length, duplicates, and captions that still describe the character's fixed look | – |
+
+Each score gives its mean and its worst image or pair, so it's clear which image to look at
+first.
+
+**A dataset made with the default settings** (an A100 run, October 2026):
+
+| Score | Mean | Worst | Worst image or pair |
+|---|---|---|---|
+| Identity | 0.026 | 0.062 | back view |
+| Face identity | 0.025 | 0.077 | profile portrait |
+| Consistency | 0.043 | 0.114 | back view and anger close-up |
+| Face size, px | 243 | 84 | side view |
+| Face sharpness | 1.13× | 0.15× | three-quarter view |
+| Diversity, bits | 27.2 | 5 | three-quarter and side views |
+
+All 16 images count as the same character, faces were found in all but the back view, and
+all 16 captions start with the trigger word and leave out the character's fixed look.
+
+**Limits:**
+- **The face score catches damaged faces, not changed features.** On a front face blurred or
+  JPEG-damaged on purpose, it rose from 0.006 to 0.076–0.202. But on four real faces redrawn
+  by face repair without the reference, the kind of repair that changed the eyes and brows
+  (see [Face repair](#face-repair-experimental)), it moved by 0.003 at most.
+- **Only whole-image CCIP has a limit** (0.1785, from CCIP's authors). Face identity,
+  consistency and diversity are measured but not judged, until more characters give a
+  baseline.
+- **Diversity is coarse.** A 64-bit fingerprint sees the layout and brightness, not the pose
+  or expression: a front and a back view on white differ in only 5 bits.
+- **Anime only**, like the quality gate.
 
 ## Development
 
