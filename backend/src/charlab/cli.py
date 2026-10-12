@@ -116,7 +116,12 @@ def _generate(args: argparse.Namespace) -> int:
             f"output:    {out}",
             f"quality:   {settings.style} checks, up to {settings.quality.max_attempts} "
             "attempts per image",
-            f"repair:    {settings.face_repair.mode} faces",
+            "repair:    "
+            + (
+                "off"
+                if settings.face_repair.mode == "off"
+                else f"{settings.face_repair.mode} faces"
+            ),
         ]
         print(format_plan(jobs, header, args.trigger))
         return 0

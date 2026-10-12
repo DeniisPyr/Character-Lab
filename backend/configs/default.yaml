@@ -83,16 +83,20 @@ quality:
   duplicate_max_bits: 2
 
 face_repair:
-  # Which faces get redrawn with the generator, right after the quality gate:
-  # - failed: only faces that still fail the gate after every attempt (the safe default;
-  #   in our runs every image passed, so it rarely runs)
-  # - small: also faces whose shorter side is below small_below_px, even if they passed
+  # Experimental, so off by default. A repair redraws the face with the generator right after
+  # the quality gate, and makes it measurably sharper. But in GPU tests (2026-10-12) it also
+  # changed facial features: wider eyes with lighter irises, thicker brows. The identity
+  # score (CCIP) did not notice, so the checks below cannot stop it.
   # - off: never
-  mode: failed
+  # - failed: only faces that still fail the gate after every attempt (in our runs every
+  #   image passed, so this rarely runs)
+  # - small: also faces whose shorter side is below small_below_px. Not recommended: on good
+  #   faces the feature changes outweigh the gain.
+  mode: off
   small_below_px: 128
-  # Give the generator a close-up of the reference's face as Picture 2, to anchor the face.
-  # With a front-facing reference, a repair once drew a front face over a side profile; the
-  # checks below rejected it.
+  # Give the generator a close-up of the reference's face as Picture 2. It keeps the eyes and
+  # features closer to the character's, but pulls faces toward a front view (a side profile's
+  # layout fell to 0.77-0.81); the checks below reject those repairs.
   use_reference: true
   # A repaired face replaces the original only if the image keeps its structure and gets
   # better. Limits from a GPU experiment (2026-10-11): good repairs kept a layout similarity
