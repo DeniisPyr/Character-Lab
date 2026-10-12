@@ -38,14 +38,25 @@ _HAIR_CLAUSE = re.compile(
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 
+def _sentences(text: str) -> list[str]:
+    return [sentence for sentence in _SENTENCE_END.split(text.strip()) if sentence]
+
+
+def _clean(sentence: str) -> str:
+    """The sentence without hair clauses, or "" if it is dropped whole."""
+    sentence = _HAIR_CLAUSE.sub("", sentence)
+    return "" if _DROP.search(sentence) else sentence
+
+
 def clean_description(text: str) -> str:
     """Remove the character's fixed look and filler from a Florence-2 description."""
-    kept = []
-    for sentence in _SENTENCE_END.split(text.strip()):
-        sentence = _HAIR_CLAUSE.sub("", sentence)
-        if sentence and not _DROP.search(sentence):
-            kept.append(sentence)
-    return " ".join(kept)
+    return " ".join(kept for sentence in _sentences(text) if (kept := _clean(sentence)))
+
+
+def needs_cleaning(text: str) -> bool:
+    """Whether clean_description would remove anything: the text describes the character's
+    fixed look (hair, eyes, skin) or has filler."""
+    return any(_clean(sentence) != sentence for sentence in _sentences(text))
 
 
 def build_caption(trigger: str, tags: str, description: str | None) -> str:

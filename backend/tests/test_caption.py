@@ -13,6 +13,7 @@ from charlab.pipeline.caption import (
     build_caption,
     clean_description,
     load_florence,
+    needs_cleaning,
 )
 from charlab.pipeline.stages import StageUnavailable
 
@@ -35,6 +36,12 @@ def test_real_descriptions_lose_the_fixed_look_and_filler(name):
 
     assert cleaned
     assert not FIXED_LOOK_OR_FILLER.search(cleaned)
+
+
+def test_raw_descriptions_need_cleaning_and_finished_captions_do_not():
+    for description in DESCRIPTIONS.values():
+        assert needs_cleaning(description)
+        assert not needs_cleaning(build_caption("mychar", "full body, front view", description))
 
 
 def test_outfit_pose_and_background_are_kept():

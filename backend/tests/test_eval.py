@@ -6,7 +6,7 @@ from PIL import Image, ImageFilter
 
 from charlab.config import load_settings
 from charlab.eval.dataset import InvalidDataset, load_dataset
-from charlab.eval.metrics import Scorer
+from charlab.eval.metrics import ImageScore, Scorer, Scores, summarise
 from charlab.pipeline.faces import Face
 
 SETTINGS = load_settings().quality
@@ -144,3 +144,72 @@ def test_without_a_face_in_the_reference_faces_are_not_compared(tmp_path, caplog
     assert image.face == FACE
     assert image.face_identity is image.sharpness is None
     assert "no face found in the reference" in caplog.text
+
+
+def image(
+    name, identity, face=None, face_identity=None, sharpness=None, caption=None, size=(64, 64)
+):
+    return ImageScore(name, size, identity, face, face_identity, sharpness, caption)
+
+
+def test_summary_gives_each_score_its_mean_and_worst_image():
+    small = Face((0, 0, 40, 50), 0.9)
+    images = (
+        image("a.png", 0.01, FACE, 0.02, 1.0, "mychar, front view. She smiles."),
+        image("b.png", 0.05, small, 0.06, 0.2, "mychar, side view. She has long dark hair."),
+        image("c.png", 0.30, size=(32, 64), caption="other, back view."),
+    )
+    consistency = np.array([[0, 0.02, 0.4], [0.02, 0, 0.3], [0.4, 0.3, 0]])
+    bits = np.array([[0, 5, 30], [5, 0, 20], [30, 20, 0]])
+
+    summary = summarise(Scores(images, consistency, bits, ("d.txt",)), same_character_below=0.18)
+
+    assert summary["images"] == 3
+    assert summary["identity"] == {
+        "mean": 0.12,
+        "worst": 0.3,
+        "worst_image": "c.png",
+        "same_character": 2,
+    }
+    assert summary["face_identity"] == {"mean": 0.04, "worst": 0.06, "worst_image": "b.png"}
+    assert summary["faces"] == {"found": 2, "missing": ["c.png"]}
+    assert summary["face_size"] == {"mean": 84.0, "worst": 40, "worst_image": "b.png"}
+    assert summary["sharpness"]["worst_image"] == "b.png"
+    assert summary["consistency"] == {"mean": 0.24, "worst": 0.4, "worst_pair": ["a.png", "c.png"]}
+    assert summary["diversity"] == {"mean": 18.3333, "worst": 5, "worst_pair": ["a.png", "b.png"]}
+    assert summary["sizes"] == {"64x64": 2, "32x64": 1}
+
+
+def test_summary_checks_the_captions_a_trainer_gets():
+    images = (
+        image("a.png", 0, caption="mychar, front view. She smiles."),
+        image("b.png", 0, caption="mychar, side view. She has long dark hair."),
+        image("c.png", 0, caption="mychar. She smiles."),
+        image("d.png", 0, caption="other, back view."),
+        image("e.png", 0),
+    )
+    scores = Scores(images, np.zeros((5, 5)), np.zeros((5, 5), dtype=int), ("f.txt",))
+
+    captions = summarise(scores, same_character_below=0.18)["captions"]
+
+    assert captions == {
+        "captioned": 4,
+        "missing": ["e.png"],
+        "orphans": ["f.txt"],
+        "trigger": "mychar",
+        "with_trigger": 3,
+        "words": {"min": 3, "mean": 4.8, "max": 8},
+        "distinct": 4,
+        "need_cleaning": ["b.png"],
+    }
+
+
+def test_a_single_image_without_a_face_or_caption_has_nothing_to_compare():
+    scores = Scores((image("a.png", 0.01),), np.zeros((1, 1)), np.zeros((1, 1), dtype=int), ())
+
+    summary = summarise(scores, same_character_below=0.18)
+
+    assert summary["consistency"] is summary["diversity"] is None
+    assert summary["face_identity"] is summary["face_size"] is summary["sharpness"] is None
+    assert summary["captions"]["words"] is None
+    assert summary["captions"]["trigger"] is None
