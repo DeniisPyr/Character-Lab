@@ -2,11 +2,14 @@ import json
 import zipfile
 from pathlib import Path
 
+import numpy as np
 import pytest
 from PIL import Image
 
 from charlab import __version__, cli
 from charlab.cli import main
+from charlab.eval.metrics import ImageScore, Scores
+from charlab.pipeline.faces import Face
 from charlab.pipeline.jobs import Check
 from charlab.pipeline.stages import StageUnavailable
 
@@ -262,3 +265,50 @@ def test_face_repair_runs_only_when_switched_on(fake_models, reference, tmp_path
                  "--config", str(on)]) == 0  # fmt: skip
 
     assert FakeRepair.created == ["failed"]
+
+
+class FakeScorer:
+    """Scores every image as the same character with one face, without models."""
+
+    def __init__(self, settings):
+        pass
+
+    def __call__(self, reference, dataset):
+        images = tuple(
+            ImageScore(e.name, e.image.size, 0.01, Face((0, 0, 99, 99), 0.9), 0.02, 0.5, e.caption)
+            for e in dataset.entries
+        )
+        count = len(images)
+        return Scores(images, np.zeros((count, count)), np.full((count, count), 20), ())
+
+
+def test_eval_scores_a_dataset_and_writes_the_report(
+    capsys, fake_models, monkeypatch, reference, tmp_path
+):
+    monkeypatch.setattr(cli, "Scorer", FakeScorer)
+    out = tmp_path / "mychar"
+    assert main(["generate", reference, "--trigger", "mychar", "--out", str(out)]) == 0
+    capsys.readouterr()
+
+    assert main(["eval", str(out), "--reference", reference]) == 0
+
+    content = json.loads((out / "eval.json").read_text("utf-8"))
+    assert (content["dataset"], content["reference"]) == ("mychar", "ref.png")
+    assert content["charlab"] == __version__
+    assert content["summary"]["captions"]["with_trigger"] == 16
+    assert (out / "eval.md").read_text("utf-8").startswith("# Evaluation of mychar")
+    printed = capsys.readouterr().out
+    assert "scored 16 images against ref.png" in printed
+    assert "same character: 16/16, faces found: 16/16, captioned: 16/16" in printed
+
+
+def test_eval_reports_a_missing_dataset_or_reference(capsys, reference, tmp_path):
+    assert main(["eval", str(tmp_path / "missing"), "--reference", reference]) == 2
+    error = capsys.readouterr().err
+    assert error.startswith("charlab eval: error:") and "missing: not a folder" in error
+
+    data = tmp_path / "data"
+    data.mkdir()
+    Image.new("RGB", (64, 64)).save(data / "001.png")
+    assert main(["eval", str(data), "--reference", "nope.png"]) == 2
+    assert "nope.png: not found" in capsys.readouterr().err
