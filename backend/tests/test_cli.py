@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from charlab import __version__, cli
+from charlab import __version__, cli, make
 from charlab.cli import main
 from charlab.eval.metrics import ImageScore, Scores
 from charlab.pipeline.faces import Face
@@ -94,8 +94,8 @@ class FakeRepair:
 def fake_models(monkeypatch):
     monkeypatch.setattr(cli, "QwenGenerator", FakeGenerator)
     monkeypatch.setattr(cli, "FlorenceCaptioner", FakeCaptioner)
-    monkeypatch.setattr(cli, "QualityGate", FakeGate)
-    monkeypatch.setattr(cli, "FaceRepairStage", FakeRepair)
+    monkeypatch.setattr(make, "QualityGate", FakeGate)
+    monkeypatch.setattr(make, "FaceRepairStage", FakeRepair)
     monkeypatch.setattr(FakeRepair, "created", [])
     monkeypatch.setattr(FakeGate, "fail_first_front", False)
 

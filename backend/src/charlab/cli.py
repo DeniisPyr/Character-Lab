@@ -6,7 +6,6 @@ import re
 import sys
 import textwrap
 from collections.abc import Sequence
-from functools import partial
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -16,15 +15,13 @@ from charlab.config import Settings, load_settings
 from charlab.eval.dataset import InvalidDataset, load_dataset
 from charlab.eval.metrics import Scorer, summarise
 from charlab.eval.report import write_eval
+from charlab.make import make_dataset
 from charlab.pipeline.caption import FlorenceCaptioner, build_caption
 from charlab.pipeline.export import Export
 from charlab.pipeline.generate import QwenGenerator
 from charlab.pipeline.jobs import Job, plan
 from charlab.pipeline.prepare import InvalidReference, load_reference, prepare_reference
-from charlab.pipeline.quality import QualityGate
-from charlab.pipeline.repair import FaceRepairStage
-from charlab.pipeline.runner import run
-from charlab.pipeline.stages import Stages, StageUnavailable
+from charlab.pipeline.stages import StageUnavailable
 from charlab.recipe import Recipe, load_recipe
 
 TRIGGER = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -139,41 +136,27 @@ def _generate(args: argparse.Namespace) -> int:
         return 0
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
-    generator = QwenGenerator(settings.generation)
-    gate = QualityGate(settings.quality)
-    repair = None
-    if settings.face_repair.mode != "off":
-        repair = FaceRepairStage(settings.face_repair, generator, gate)
-    stages = Stages(
-        prepare=partial(prepare_reference, settings=settings.prepare),
-        generate=generator,
-        caption=FlorenceCaptioner(settings.caption),
-        check=gate,
-        repair=repair,
-    )
-    export = Export(out, jobs)
     try:
-        results = run(
+        results = make_dataset(
             args.reference,
             jobs,
-            stages,
-            on_image=export.save_image,
-            # Frees the GPU before the caption model loads.
-            after_generate=generator.unload,
-            max_attempts=settings.quality.max_attempts,
+            out,
+            args.trigger,
+            settings,
+            QwenGenerator(settings.generation),
+            FlorenceCaptioner(settings.caption),
+            _run_record(args, settings, recipe),
         )
     except (InvalidReference, StageUnavailable) as error:
         return _error(str(error))
 
-    export.write_captions(results, args.trigger, _run_record(args, settings, recipe))
-    export.write_report(results, settings.quality)
     print(f"saved {len(results)} images with captions to {out}")
     failed = [r.job.key for r in results if r.check and r.check.failures]
     print(f"quality: {len(results) - len(failed)}/{len(results)} images passed every check")
     if failed:
         print(f"failed all attempts (kept the best): {', '.join(failed)}")
     if args.zip:
-        print(f"packed the dataset into {export.zip()}")
+        print(f"packed the dataset into {Export(out, jobs).zip()}")
     return 0
 
 
