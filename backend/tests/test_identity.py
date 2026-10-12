@@ -31,10 +31,10 @@ class FakeMetric:
         self.inputs = []
 
     def run(self, outputs, inputs):
-        a, b = inputs["input"]
+        """Like the real model: the difference between every pair of the N inputs."""
+        first = inputs["input"][:, 0]
         self.inputs.append(inputs["input"].shape)
-        difference = abs(float(a[0] - b[0]))
-        return [np.array([[0.0, difference], [difference, 0.0]], dtype=np.float32)]
+        return [np.abs(first[:, None] - first[None, :]).astype(np.float32)]
 
 
 @pytest.fixture
@@ -69,6 +69,18 @@ def test_difference_compares_two_features_with_the_metric_model(ccip):
     assert model.difference(white, white) == 0
     assert model.difference(white, black) > 0
     assert sessions[SETTINGS.ccip_metric.file].inputs == [(2, 768), (2, 768)]
+
+
+def test_differences_compare_every_pair_in_one_run(ccip):
+    model, sessions, _ = ccip
+    features = [model.features(Image.new("RGB", (64, 64), grey)) for grey in (0, 128, 255)]
+
+    matrix = model.differences(features)
+
+    assert matrix.shape == (3, 3)
+    assert matrix[0, 2] == pytest.approx(model.difference(features[0], features[2]))
+    assert matrix[0, 1] < matrix[0, 2]
+    assert sessions[SETTINGS.ccip_metric.file].inputs[0] == (3, 768)
 
 
 def test_each_model_loads_once_when_first_needed(ccip):

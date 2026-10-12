@@ -21,17 +21,17 @@ from charlab.pipeline.jobs import Check, Job
 
 log = logging.getLogger(__name__)
 
-# Margin around the face box for the sharpness crop, and the size it is measured at, so faces
+# Margin around the face box for a face crop, and the size sharpness is measured at, so faces
 # of different sizes are comparable.
 FACE_MARGIN = 0.25
 SHARPNESS_SIZE = 256
 
 
-def sharpness(image: Image.Image, face: Face) -> float:
-    """Variance of the Laplacian over the face: high for crisp edges, low for blur."""
+def face_crop(image: Image.Image, face: Face) -> Image.Image:
+    """The face with a margin of FACE_MARGIN of its longer side, cut to the image."""
     left, top, right, bottom = face.box
     margin = int(FACE_MARGIN * max(right - left, bottom - top))
-    crop = image.crop(
+    return image.crop(
         (
             max(0, left - margin),
             max(0, top - margin),
@@ -39,6 +39,11 @@ def sharpness(image: Image.Image, face: Face) -> float:
             min(image.height, bottom + margin),
         )
     )
+
+
+def sharpness(image: Image.Image, face: Face) -> float:
+    """Variance of the Laplacian over the face: high for crisp edges, low for blur."""
+    crop = face_crop(image, face)
     grey = np.asarray(crop.convert("L").resize((SHARPNESS_SIZE,) * 2), dtype=np.float32)
     laplacian = (
         grey[:-2, 1:-1] + grey[2:, 1:-1] + grey[1:-1, :-2] + grey[1:-1, 2:] - 4 * grey[1:-1, 1:-1]
