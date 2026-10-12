@@ -17,7 +17,8 @@ def load_onnx(model: HubFile) -> Any:
         from huggingface_hub import hf_hub_download
     except ImportError as error:
         raise StageUnavailable(
-            "the quality checks need onnxruntime; install the package with the [gpu] extra"
+            "the quality checks need onnxruntime; "
+            "install the package with the [eval] or [gpu] extra"
         ) from error
     options = onnxruntime.SessionOptions()
     options.intra_op_num_threads = THREADS

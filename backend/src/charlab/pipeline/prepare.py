@@ -93,7 +93,7 @@ def rembg_mask(image: Image.Image, model: str) -> Image.Image:
         import rembg
     except (ImportError, SystemExit) as error:
         raise StageUnavailable(
-            "background removal needs rembg; install the package with the [gpu] extra"
+            "background removal needs rembg; install the package with the [eval] or [gpu] extra"
         ) from error
     return rembg.remove(image, session=rembg.new_session(model), only_mask=True)
 
