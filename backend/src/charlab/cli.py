@@ -13,6 +13,9 @@ from pydantic import ValidationError
 
 from charlab import __version__
 from charlab.config import Settings, load_settings
+from charlab.eval.dataset import InvalidDataset, load_dataset
+from charlab.eval.metrics import Scorer, summarise
+from charlab.eval.report import write_eval
 from charlab.pipeline.caption import FlorenceCaptioner, build_caption
 from charlab.pipeline.export import Export
 from charlab.pipeline.generate import QwenGenerator
@@ -50,6 +53,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="print the generation plan without loading models"
     )
     generate.add_argument("--zip", action="store_true", help="also pack the dataset into <out>.zip")
+
+    evaluate = commands.add_parser(
+        "eval", help="score a finished dataset against its reference; writes eval.json and eval.md"
+    )
+    evaluate.add_argument("dataset", type=Path, help="folder of image/caption pairs")
+    evaluate.add_argument(
+        "--reference", type=Path, required=True, help="the character reference image"
+    )
+    evaluate.add_argument("--config", type=Path, help="YAML file with settings to override")
     return parser
 
 
@@ -91,8 +103,8 @@ def _run_record(args: argparse.Namespace, settings: Settings, recipe: Recipe) ->
     }
 
 
-def _error(message: str) -> int:
-    print(f"charlab generate: error: {message}", file=sys.stderr)
+def _error(message: str, command: str = "generate") -> int:
+    print(f"charlab {command}: error: {message}", file=sys.stderr)
     return 2
 
 
@@ -165,10 +177,43 @@ def _generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _evaluate(args: argparse.Namespace) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    try:
+        settings = load_settings(args.config)
+        dataset = load_dataset(args.dataset)
+        # The prepared reference, as the quality gate saw it during generation.
+        reference = prepare_reference(args.reference, settings.prepare)
+        scores = Scorer(settings.quality)(reference, dataset)
+    except (OSError, ValidationError, InvalidDataset, InvalidReference, StageUnavailable) as error:
+        return _error(str(error), "eval")
+
+    limit = settings.quality.same_character_below
+    summary = summarise(scores, limit)
+    run = {
+        "charlab": __version__,
+        "dataset": args.dataset.resolve().name,
+        "reference": args.reference.name,
+        "same_character_below": limit,
+    }
+    paths = write_eval(args.dataset, scores.images, summary, run)
+    images, captions = summary["images"], summary["captions"]
+    print(f"scored {images} images against {args.reference.name}")
+    print(
+        f"same character: {summary['identity']['same_character']}/{images}, "
+        f"faces found: {summary['faces']['found']}/{images}, "
+        f"captioned: {captions['captioned']}/{images}"
+    )
+    print(f"wrote {' and '.join(str(path) for path in paths)}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "generate":
         return _generate(args)
+    if args.command == "eval":
+        return _evaluate(args)
     parser.print_help()
     return 0
