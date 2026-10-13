@@ -71,6 +71,10 @@ quality:
   # Limits, set from 16 generated images of one character (2026-10):
   # - CCIP difference below this counts as the same character (CCIP's F1-optimal value).
   #   Ours scored 0.008-0.063; 12 other anime characters scored 0.32-0.48.
+  #   Known issue, in progress: for semi-realistic characters this only catches very
+  #   different ones. Across 6 of them (2026-10-13), 65% of wrong-character pairs scored
+  #   below it, and no lower limit worked for all: at 0.10, 19% still passed while 14% of
+  #   one character's own images failed.
   same_character_below: 0.1785
   # - The face's shorter side, in pixels. Ours: 79 (side view) to 423.
   min_face_px: 64
