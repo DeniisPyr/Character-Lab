@@ -47,14 +47,9 @@ def make_dataset(
     generator: QwenGenerator,
     captioner: Caption,
     record: dict[str, Any],
-    free_gpu: bool = True,
 ) -> list[Result]:
-    """Make the dataset in `out` and return the results.
-
-    `record` describes the run for the manifest. With `free_gpu`, the generator unloads before
-    captioning so the caption model fits; without it, the generator stays loaded for the next
-    dataset, which needs a GPU with room for both (80 GB).
-    """
+    """Make the dataset in `out` and return the results. `record` describes the run for the
+    manifest."""
     gate = QualityGate(settings.quality)
     repair = None
     if settings.face_repair.mode != "off":
@@ -72,7 +67,8 @@ def make_dataset(
         jobs,
         stages,
         on_image=export.save_image,
-        after_generate=generator.unload if free_gpu else None,
+        # Frees the GPU before the caption model loads.
+        after_generate=generator.unload,
         max_attempts=settings.quality.max_attempts,
     )
     export.write_captions(results, trigger, record)
