@@ -1,0 +1,2 @@
+# The same rules as the Python package.
+extend = "../backend/pyproject.toml"
