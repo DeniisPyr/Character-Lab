@@ -1,6 +1,8 @@
 """Runs the stages over a plan of jobs."""
 
 import logging
+import math
+import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -14,6 +16,14 @@ log = logging.getLogger(__name__)
 # A retry's seed is the job's seed plus this times the retry number. Recipe positions stay far
 # below it, so a retry never reuses another job's seed.
 RETRY_SEED_STEP = 1000
+
+
+def time_left(seconds: float, done: int, remaining: int) -> str:
+    """How long the remaining images will take, at the pace of the `done` ones so far."""
+    if not remaining:
+        return ""
+    minutes = seconds / done * remaining / 60
+    return "under a minute left" if minutes < 1 else f"about {math.ceil(minutes)} min left"
 
 
 def _kept(attempts: Sequence[Attempt]) -> int:
@@ -59,6 +69,8 @@ def run(
         stages.repair.start(picture_1)
 
     images, attempts_by_key, kept_by_key, repairs_by_key = {}, {}, {}, {}
+    # The first image includes loading the model, so the pace is measured from the second.
+    first_done = None
     for number, job in enumerate(jobs, start=1):
         missing = [key for key in job.references if key not in images]
         if missing:
@@ -95,7 +107,12 @@ def run(
         attempts_by_key[job.key] = attempts
         kept_by_key[job.key] = kept
         repairs_by_key[job.key] = repair
-        log.info("generated %s (%d/%d)", job.key, number, len(jobs))
+        left = ""
+        if first_done is None:
+            first_done = time.perf_counter()
+        else:
+            left = time_left(time.perf_counter() - first_done, number - 1, len(jobs) - number)
+        log.info("generated %s (%d/%d)%s", job.key, number, len(jobs), left and f", {left}")
         if on_image:
             on_image(job, image)
     if after_generate:
