@@ -2,7 +2,9 @@
 
 import argparse
 import logging
+import os
 import shlex
+import subprocess
 import sys
 import textwrap
 import time
@@ -167,6 +169,11 @@ def duration(seconds: float) -> str:
     return f"{minutes} min {rest} s" if minutes else f"{rest} s"
 
 
+def shell_arg(text: str) -> str:
+    """`text` quoted, if needed, so a printed command can be pasted into this system's shell."""
+    return subprocess.list2cmdline([text]) if os.name == "nt" else shlex.quote(text)
+
+
 def finish(
     results: Sequence[Result],
     export: Export,
@@ -193,11 +200,11 @@ def finish(
             lines.append(f"Failed every try, so the best one was kept: {', '.join(failed)}")
     if packed:
         lines.append(f"Packed into {packed}")
-    reference = shlex.quote(str(args.reference))
+    reference = shell_arg(str(args.reference))
     lines += [
         "",
         "Next:",
-        f"  check the dataset  charlab eval {shlex.quote(str(out))} --reference {reference}",
+        f"  check the dataset  charlab eval {shell_arg(str(out))} --reference {reference}",
         f"  train a LoRA       point ai-toolkit or kohya at {out}; every caption starts with "
         f'"{args.trigger}"',
     ]

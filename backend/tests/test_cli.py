@@ -323,3 +323,9 @@ def test_eval_reports_a_missing_dataset_or_reference(capsys, reference, tmp_path
 )
 def test_durations_read_naturally(seconds, text):
     assert cli.duration(seconds) == text
+
+
+def test_suggested_commands_quote_paths_for_this_systems_shell():
+    assert cli.shell_arg("results/diana") == "results/diana"
+    windows = cli.os.name == "nt"
+    assert cli.shell_arg("my results") == ('"my results"' if windows else "'my results'")
