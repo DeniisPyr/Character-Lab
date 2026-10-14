@@ -1,0 +1,267 @@
+{
+  "charlab": "0.2.0.dev0",
+  "reference": "Stuff_00020_.png",
+  "recipe": "lora-character",
+  "seed": 42,
+  "description": null,
+  "prepare": {
+    "max_file_mb": 20.0,
+    "max_pixels": 25000000,
+    "min_side": 512,
+    "background": "auto",
+    "background_model": "birefnet-general",
+    "crop_margin": 0.05
+  },
+  "style": "anime",
+  "generation": {
+    "model": "Qwen/Qwen-Image-Edit-2511",
+    "transformer": "bf16",
+    "gguf": {
+      "repo": "unsloth/Qwen-Image-Edit-2511-GGUF",
+      "file": "qwen-image-edit-2511-Q6_K.gguf"
+    },
+    "lightning_lora": {
+      "repo": "lightx2v/Qwen-Image-Edit-2511-Lightning",
+      "file": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors"
+    },
+    "steps": 4,
+    "cfg": 1.0
+  },
+  "quality": {
+    "face_detector": {
+      "repo": "deepghs/anime_face_detection",
+      "file": "face_detect_v1.4_s/model.onnx"
+    },
+    "face_confidence": 0.307,
+    "ccip_features": {
+      "repo": "deepghs/ccip_onnx",
+      "file": "ccip-caformer-24-randaug-pruned/model_feat.onnx"
+    },
+    "ccip_metric": {
+      "repo": "deepghs/ccip_onnx",
+      "file": "ccip-caformer-24-randaug-pruned/model_metrics.onnx"
+    },
+    "max_attempts": 3,
+    "same_character_below": 0.1785,
+    "min_face_px": 64,
+    "min_sharpness": 0.07,
+    "duplicate_max_bits": 2
+  },
+  "captioning": {
+    "model": "florence-community/Florence-2-large",
+    "task": "<MORE_DETAILED_CAPTION>",
+    "num_beams": 3,
+    "max_new_tokens": 512
+  },
+  "trigger": "diana",
+  "images": [
+    {
+      "image": "001_turnaround_front.png",
+      "caption_file": "001_turnaround_front.txt",
+      "view": "turnaround",
+      "variant": "front",
+      "size": [
+        832,
+        1216
+      ],
+      "seed": 42,
+      "prompt": "Show the character's full body standing upright in a relaxed neutral pose, facing the camera, arms at their sides, head to feet in frame. Plain white studio background, soft even lighting. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, full body, front view, standing, plain white background. The image shows a young woman standing in a studio with a white background. She is wearing a beige off-the-shoulder dress with long sleeves and a round neckline. The dress is made of a soft, lightweight fabric and has a relaxed fit. She has a serious expression on her face and is looking directly at the camera. Her feet are bare and she is standing with one foot in front of the other."
+    },
+    {
+      "image": "002_turnaround_three_quarter.png",
+      "caption_file": "002_turnaround_three_quarter.txt",
+      "view": "turnaround",
+      "variant": "three_quarter",
+      "size": [
+        832,
+        1216
+      ],
+      "seed": 43,
+      "prompt": "Show the character's full body in a three-quarter view, turned partly toward the right edge of the image, standing relaxed, head to feet in frame. Picture 2 shows the same character's full body from the front; use it for the outfit and proportions. Plain white studio background, soft even lighting. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, full body, three-quarter view, standing, plain white background. The image is a full-length portrait of a young woman standing in a relaxed pose. She is wearing a beige off-the-shoulder dress with long sleeves and a round neckline. The dress is made of a soft, lightweight fabric and has a relaxed fit. She has a neutral expression on her face and is looking directly at the camera."
+    },
+    {
+      "image": "003_turnaround_side.png",
+      "caption_file": "003_turnaround_side.txt",
+      "view": "turnaround",
+      "variant": "side",
+      "size": [
+        832,
+        1216
+      ],
+      "seed": 44,
+      "prompt": "Show the character's full body in strict side profile, facing the left edge of the image, standing upright, head to feet in frame. Picture 2 shows the same character's full body from the front; use it for the outfit and proportions. Plain white studio background, soft even lighting. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, full body, side view, standing, plain white background. The image shows a young woman standing in a side profile pose. She is wearing a white off-the-shoulder dress with long sleeves and a round neckline. The dress is short and flowy, with a relaxed fit. She has a neutral expression on her face and is looking off to the side."
+    },
+    {
+      "image": "004_turnaround_back.png",
+      "caption_file": "004_turnaround_back.txt",
+      "view": "turnaround",
+      "variant": "back",
+      "size": [
+        832,
+        1216
+      ],
+      "seed": 45,
+      "prompt": "Show the character's full body from directly behind, standing upright, head to feet in frame. Picture 2 shows the same character's full body from the front; use it for the outfit and proportions. Plain white studio background, soft even lighting. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, full body, back view, standing, plain white background. The image shows a young woman standing with her back to the camera, facing away from the camera. She is wearing a beige off-the-shoulder dress with long sleeves and a round neckline. The dress is made of a soft, loose-fitting fabric and has a relaxed fit."
+    },
+    {
+      "image": "005_portrait_front.png",
+      "caption_file": "005_portrait_front.txt",
+      "view": "portrait",
+      "variant": "front",
+      "size": [
+        1024,
+        1024
+      ],
+      "seed": 46,
+      "prompt": "Make a head-and-shoulders portrait of the character looking straight at the camera with a calm, neutral expression. Plain white studio background, soft even lighting. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, head-and-shoulders portrait, front view, neutral expression, plain white background. The image is a digital portrait of a young woman. She is wearing a white off-the-shoulder top and is standing against a plain white background. The woman has a serious expression on her face and is looking directly at the camera."
+    },
+    {
+      "image": "006_portrait_three_quarter.png",
+      "caption_file": "006_portrait_three_quarter.txt",
+      "view": "portrait",
+      "variant": "three_quarter",
+      "size": [
+        1024,
+        1024
+      ],
+      "seed": 47,
+      "prompt": "Make a head-and-shoulders portrait with the head turned three-quarters toward the left edge of the image, eyes on the camera. Picture 2 shows the same character's face; match the face, hair colour and hair texture to it. Indoors beside a window, soft side daylight, the room softly blurred behind. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, head-and-shoulders portrait, three-quarter view, indoors beside a window. The image is a portrait of a young woman. She is standing in front of a window with a view of a garden outside. She has a serious expression on her face and is looking off to the side. The background is blurred, but it appears to be a room with a lamp and a plant."
+    },
+    {
+      "image": "007_portrait_profile.png",
+      "caption_file": "007_portrait_profile.txt",
+      "view": "portrait",
+      "variant": "profile",
+      "size": [
+        1024,
+        1024
+      ],
+      "seed": 48,
+      "prompt": "Make a head-and-shoulders portrait in strict side profile, the nose pointing toward the right edge of the image. Picture 2 shows the same character's face; match the face, hair colour and hair texture to it. Outdoors, a softly blurred green park behind, daylight. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, head-and-shoulders portrait, side profile, outdoors in a park. The image is a portrait of a young woman. She is standing in a park or garden with trees and greenery in the background. The woman is facing away from the camera, with her head turned slightly to the side. She has a serious expression on her face and is wearing a white blouse. The lighting is soft and natural, highlighting the woman's features."
+    },
+    {
+      "image": "008_portrait_over_shoulder.png",
+      "caption_file": "008_portrait_over_shoulder.txt",
+      "view": "portrait",
+      "variant": "over_shoulder",
+      "size": [
+        1024,
+        1024
+      ],
+      "seed": 49,
+      "prompt": "Show the character from behind at head-and-shoulders distance, glancing back over one shoulder toward the camera. Picture 2 shows the character from behind; match the hair and collar to it. Evening, warm city lights blurred in the distance. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, head-and-shoulders portrait from behind, looking back over the shoulder, city lights at night. The image is a portrait of a young woman. She is standing in front of a city skyline at night, with the lights of the buildings visible in the background. She has a serious expression on her face and is looking directly at the camera."
+    },
+    {
+      "image": "009_expressions_joy.png",
+      "caption_file": "009_expressions_joy.txt",
+      "view": "expressions",
+      "variant": "joy",
+      "size": [
+        1024,
+        1024
+      ],
+      "seed": 50,
+      "prompt": "Show a head-and-shoulders close-up of the character laughing with a wide, genuine smile showing teeth, head tilted slightly to one side, with the neckline and shoulders of the outfit visible. Picture 2 shows the same character's face; match the face, hair colour and hair texture to it. Plain white studio background, soft even lighting. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, head-and-shoulders close-up, laughing, joyful expression, plain white background. The image is a digital portrait of a young woman. She is smiling widely and appears to be laughing. Her eyes are closed and her mouth is open, showing her teeth. The woman is wearing a white off-the-shoulder top, which is visible in the bottom right corner."
+    },
+    {
+      "image": "010_expressions_surprise.png",
+      "caption_file": "010_expressions_surprise.txt",
+      "view": "expressions",
+      "variant": "surprise",
+      "size": [
+        1024,
+        1024
+      ],
+      "seed": 51,
+      "prompt": "Show a head-and-shoulders close-up of the character looking surprised, facing the camera: eyebrows raised high and arched, eyes wide open, mouth open in a small round shape, with the neckline and shoulders of the outfit visible. Picture 2 shows the same character's face; match the face, hair colour and hair texture to it. Plain white studio background, soft even lighting. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, head-and-shoulders close-up, surprised expression, plain white background. The image is a close-up portrait of a young woman. She has a surprised or shocked expression on her face, with her mouth wide open and her eyes wide open. She is wearing a white top with a strapless neckline. The background is plain white."
+    },
+    {
+      "image": "011_expressions_anger.png",
+      "caption_file": "011_expressions_anger.txt",
+      "view": "expressions",
+      "variant": "anger",
+      "size": [
+        1024,
+        1024
+      ],
+      "seed": 52,
+      "prompt": "Show a head-and-shoulders close-up of the character looking angry, the face turned three-quarters toward the right edge of the image: furrowed brows, narrowed eyes, clenched jaw, with the neckline and shoulders of the outfit visible. Picture 2 shows the same character's face; match the face, hair colour and hair texture to it. Plain white studio background, soft even lighting. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, head-and-shoulders close-up, angry expression, three-quarter view, plain white background. The image is a close-up portrait of a young woman. She is wearing a white top with a low neckline. The image is digitally edited, giving it a realistic and lifelike appearance."
+    },
+    {
+      "image": "012_expressions_sadness.png",
+      "caption_file": "012_expressions_sadness.txt",
+      "view": "expressions",
+      "variant": "sadness",
+      "size": [
+        1024,
+        1024
+      ],
+      "seed": 53,
+      "prompt": "Show a head-and-shoulders close-up of the character looking sad, head lowered and eyes cast down: downturned mouth, slightly raised inner eyebrows, with the neckline and shoulders of the outfit visible. Picture 2 shows the same character's face; match the face, hair colour and hair texture to it. Plain white studio background, soft even lighting. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, head-and-shoulders close-up, sad expression, looking down, plain white background. The image is a close-up portrait of a young woman. Her eyes are closed and her eyebrows are furrowed, indicating that she is deep in thought."
+    },
+    {
+      "image": "013_scenes_city_walk.png",
+      "caption_file": "013_scenes_city_walk.txt",
+      "view": "scenes",
+      "variant": "city_walk",
+      "size": [
+        1280,
+        720
+      ],
+      "seed": 54,
+      "prompt": "Place the character walking along a quiet city street in daylight, natural mid-stride pose, camera at eye level, medium-wide shot with the character filling most of the frame height, only a few people far in the background. Picture 2 shows the same character's face; match the face, hair colour and hair texture to it. Render the whole scene, background included, in the same art style as Picture 1. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, walking along a city street, daylight, medium-wide shot. The image shows a young woman walking on a street in a city. She is wearing a white off-the-shoulder dress. The woman is walking confidently with her left hand in her pocket and her right hand resting on her hip. She has a serious expression on her face and is looking directly at the camera. The street is lined with buildings on both sides and there are people walking in the background."
+    },
+    {
+      "image": "014_scenes_hilltop_sunset.png",
+      "caption_file": "014_scenes_hilltop_sunset.txt",
+      "view": "scenes",
+      "variant": "hilltop_sunset",
+      "size": [
+        1280,
+        720
+      ],
+      "seed": 55,
+      "prompt": "Show the character standing on a grassy hilltop at sunset, body turned slightly to the side with one hand resting on the opposite arm, seen from a low camera angle, strong golden backlight outlining the hair and shoulders, the character filling most of the frame height. Picture 2 shows the same character's face; match the face, hair colour and hair texture to it. Render the whole scene, background included, in the same art style as Picture 1. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, standing on a grassy hilltop at sunset, backlit, low camera angle. The image is a portrait of a young woman standing on a hilltop at sunset. She is wearing a white off-the-shoulder dress. The woman is looking directly at the camera with a serious expression on her face. The background is a beautiful landscape of rolling hills and fields, with the sun setting in the distance."
+    },
+    {
+      "image": "015_scenes_lantern_market.png",
+      "caption_file": "015_scenes_lantern_market.txt",
+      "view": "scenes",
+      "variant": "lantern_market",
+      "size": [
+        1280,
+        720
+      ],
+      "seed": 56,
+      "prompt": "Show the character sitting at a small wooden table at a night market lit by warm paper lanterns, upper body in frame, sharp focus on the character, warm light on the face against a dark background. Picture 2 shows the same character's face; match the face, hair colour and hair texture to it. Render the whole scene, background included, in the same art style as Picture 1. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, sitting at a table at a night market, warm lantern light, upper body. The image shows a young woman sitting at a wooden table in a dimly lit restaurant or cafe. She is wearing a white off-the-shoulder sweater. The woman is looking directly at the camera with a serious expression on her face. Behind her, there are several hanging lanterns that are lit up, creating a warm and cozy atmosphere. The background is blurred, but it appears to be a busy street with people walking around and tables and chairs."
+    },
+    {
+      "image": "016_scenes_meadow_rest.png",
+      "caption_file": "016_scenes_meadow_rest.txt",
+      "view": "scenes",
+      "variant": "meadow_rest",
+      "size": [
+        1280,
+        720
+      ],
+      "seed": 57,
+      "prompt": "Show the character lying on their side in a flower meadow, propped up on one elbow with the head raised and the face toward the camera, the body stretched across the frame from left to right, the whole body from head to feet in frame, camera at ground level, soft midday light, natural muted colours. Picture 2 shows the same character's face; match the face, hair colour and hair texture to it. Render the whole scene, background included, in the same art style as Picture 1. Keep the character's face, hairstyle, body proportions, outfit and art style identical to Picture 1.",
+      "caption": "diana, lying on the side in a flower meadow, propped up on one elbow, full body. The image shows a young woman lying on the ground in a field of colorful flowers. She is wearing a white dress. The woman is resting her head on her hand and is looking directly at the camera with a peaceful expression. The field is filled with a variety of flowers in different colors, including red, orange, yellow, pink, blue, and purple. The sky is blue and there are trees in the background."
+    }
+  ]
+}
