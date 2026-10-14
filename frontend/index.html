@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Character Lab turns one character image into a training-ready LoRA dataset. A replay of one real run."
+    />
+    <title>Character Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="Character Lab, top of the page">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>Character Lab</span>
+        </a>
+        <div class="header-links">
+          <span class="replay-pill"><span class="status-dot" aria-hidden="true"></span>Replay of a real run</span>
+          <a class="button button-ghost" href="https://github.com/DeniisPyr/Character-Lab">GitHub</a>
+        </div>
+      </header>
+
+      <main id="top">
+        <section class="hero" aria-labelledby="page-title">
+          <div class="hero-text">
+            <p class="eyebrow">Open-source LoRA dataset generator</p>
+            <h1 id="page-title">One image.<br /><em>A complete dataset.</em></h1>
+            <p class="hero-copy">
+              Character Lab turns one picture of a character into a training-ready LoRA dataset:
+              16 consistent images in four kinds of shots, each checked and captioned. This page
+              shows one real run, image for image. Nothing runs in your browser.
+            </p>
+            <div class="hero-actions">
+              <a class="button" href="#dataset">See the dataset</a>
+              <a class="button button-ghost" href="#run">Run it yourself</a>
+            </div>
+          </div>
+          <div class="hero-images" aria-hidden="true">
+            <img class="tall" src="images/001_turnaround_front.webp" alt="" />
+            <img src="images/009_expressions_joy.webp" alt="" />
+            <img src="images/014_scenes_hilltop_sunset.webp" alt="" />
+          </div>
+          <ul class="stats" id="stats" aria-label="This run in numbers"></ul>
+        </section>
+
+        <section class="section reference" aria-labelledby="reference-title">
+          <div class="reference-image panel">
+            <img src="images/reference.webp" alt="The reference image: Diana, full body, in an oversized cream sweater" />
+            <p class="image-note">The only input: one image of Diana.</p>
+          </div>
+          <div>
+            <p class="step-label"><span>01</span> The reference</p>
+            <h2 id="reference-title">Everything starts from one image</h2>
+            <ol class="steps">
+              <li><strong>Prepare.</strong> The image is checked and cropped to the character.</li>
+              <li>
+                <strong>Generate.</strong> <span id="model-name">Qwen-Image-Edit-2511</span> draws each
+                shot from the reference. Later shots also see an earlier one, which keeps the outfit
+                and face consistent.
+              </li>
+              <li>
+                <strong>Check.</strong> A quality gate scores identity, face size and sharpness, and
+                makes a failed image again with a new seed.
+              </li>
+              <li>
+                <strong>Caption.</strong> Florence-2 describes each image. The caption starts with the
+                trigger word and leaves out the fixed look, so the look binds to the trigger word.
+              </li>
+              <li><strong>Export.</strong> Numbered image/caption pairs, ready for ai-toolkit or kohya.</li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="section" id="dataset" aria-labelledby="dataset-title">
+          <p class="step-label"><span>02</span> The dataset</p>
+          <h2 id="dataset-title">16 images, as charlab wrote them</h2>
+          <p class="section-copy">Select an image for its caption, prompt and scores.</p>
+          <div id="gallery" class="gallery"></div>
+        </section>
+
+        <section class="section" id="scores" aria-labelledby="scores-title">
+          <p class="step-label"><span>03</span> The scores</p>
+          <h2 id="scores-title">Checked like any run</h2>
+          <p class="section-copy">
+            From <code>charlab eval</code>. CCIP compares characters: lower differences are closer.
+          </p>
+          <div class="panel table-panel">
+            <table>
+              <thead>
+                <tr><th scope="col">Score</th><th scope="col">Mean</th><th scope="col">Worst</th><th scope="col" class="file">Worst image</th></tr>
+              </thead>
+              <tbody id="score-rows"></tbody>
+            </table>
+          </div>
+          <p class="note" id="identity-note"></p>
+        </section>
+
+        <section class="section" id="run" aria-labelledby="run-title">
+          <p class="step-label"><span>04</span> Run it yourself</p>
+          <h2 id="run-title">Your character, your dataset</h2>
+          <pre class="panel code"><code>git clone https://github.com/DeniisPyr/Character-Lab.git
+cd Character-Lab
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -e './backend[gpu]'
+charlab generate reference.png --trigger diana</code></pre>
+          <p class="section-copy">
+            Generation needs an NVIDIA GPU: 80 GB for the full model, or 24 GB in the quantized
+            mode. The <a href="https://github.com/DeniisPyr/Character-Lab#readme">README</a> has the
+            details.
+          </p>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>
+          Character Lab · MIT license · The images are real charlab output, in
+          <a href="https://github.com/DeniisPyr/Character-Lab/tree/main/examples/diana">examples/diana</a>.
+        </p>
+      </footer>
+    </div>
+
+    <dialog id="viewer" aria-labelledby="viewer-title">
+      <div class="viewer">
+        <img id="viewer-image" alt="" />
+        <div class="viewer-text">
+          <div class="viewer-top">
+            <h3 id="viewer-title"></h3>
+            <button class="icon-button" id="viewer-close" type="button" aria-label="Close">×</button>
+          </div>
+          <p class="viewer-meta" id="viewer-meta"></p>
+          <h4>Caption</h4>
+          <p id="viewer-caption"></p>
+          <h4>Prompt</h4>
+          <p class="viewer-prompt" id="viewer-prompt"></p>
+          <h4>Scores</h4>
+          <p id="viewer-scores"></p>
+          <div class="viewer-nav">
+            <button class="button button-ghost" id="viewer-previous" type="button">← Previous</button>
+            <button class="button button-ghost" id="viewer-next" type="button">Next →</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <noscript><p class="note">The gallery and scores need JavaScript.</p></noscript>
+    <script src="app.js"></script>
+  </body>
+</html>
