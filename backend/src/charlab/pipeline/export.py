@@ -34,10 +34,14 @@ class Export:
             for number, job in enumerate(jobs, start=1)
         }
 
+    def image_name(self, job: Job) -> str:
+        """The image's file name, e.g. 001_turnaround_front.png."""
+        return f"{self._stems[job.key]}.png"
+
     def save_image(self, job: Job, image: Image.Image) -> None:
         """Save one image as soon as it is generated."""
         self.out.mkdir(parents=True, exist_ok=True)
-        image.save(self.out / f"{self._stems[job.key]}.png")
+        image.save(self.out / self.image_name(job))
 
     def write_captions(self, results: Sequence[Result], trigger: str, run: dict[str, Any]) -> Path:
         """Write a caption file per image and the manifest; return the manifest's path.
@@ -73,7 +77,7 @@ class Export:
         self.out.mkdir(parents=True, exist_ok=True)
         images = [
             {
-                "image": f"{self._stems[result.job.key]}.png",
+                "image": self.image_name(result.job),
                 "passed": None if result.check is None else result.check.passed,
                 "kept_attempt": result.kept + 1,
                 "attempts": [_attempt(attempt) for attempt in result.attempts],
@@ -82,7 +86,7 @@ class Export:
             for result in results
         ]
         pairs = duplicates(
-            {f"{self._stems[r.job.key]}.png": r.image for r in results}, limits.duplicate_max_bits
+            {self.image_name(r.job): r.image for r in results}, limits.duplicate_max_bits
         )
         report = {
             "summary": {
@@ -106,7 +110,8 @@ class Export:
 
     def zip(self) -> Path:
         """Pack the dataset into <out>.zip, next to the folder."""
-        return Path(shutil.make_archive(str(self.out), "zip", root_dir=self.out))
+        shutil.make_archive(str(self.out), "zip", root_dir=self.out)
+        return self.out.with_name(f"{self.out.name}.zip")
 
 
 _LIMITS = {
