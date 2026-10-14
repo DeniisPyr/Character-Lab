@@ -301,8 +301,9 @@ def test_eval_scores_a_dataset_and_writes_the_report(
     assert content["summary"]["captions"]["with_trigger"] == 16
     assert (out / "eval.md").read_text("utf-8").startswith("# Evaluation of mychar")
     printed = capsys.readouterr().out
-    assert "scored 16 images against ref.png" in printed
-    assert "same character: 16/16, faces found: 16/16, captioned: 16/16" in printed
+    assert "Scored 16 images against ref.png." in printed
+    assert "Same character: 16 of 16. Faces found: 16 of 16. Captioned: 16 of 16." in printed
+    assert f"Details: {out / 'eval.md'} (every number is in eval.json)" in printed
 
 
 def test_eval_reports_a_missing_dataset_or_reference(capsys, reference, tmp_path):

@@ -225,13 +225,14 @@ def _evaluate(args: argparse.Namespace) -> int:
     }
     paths = write_eval(args.dataset, scores.images, summary, run)
     images, captions = summary["images"], summary["captions"]
-    print(f"scored {images} images against {args.reference.name}")
+    data, text = paths
+    print(f"\nScored {images} images against {args.reference.name}.")
     print(
-        f"same character: {summary['identity']['same_character']}/{images}, "
-        f"faces found: {summary['faces']['found']}/{images}, "
-        f"captioned: {captions['captioned']}/{images}"
+        f"Same character: {summary['identity']['same_character']} of {images}. "
+        f"Faces found: {summary['faces']['found']} of {images}. "
+        f"Captioned: {captions['captioned']} of {images}."
     )
-    print(f"wrote {' and '.join(str(path) for path in paths)}")
+    print(f"Details: {text} (every number is in {data.name})")
     return 0
 
 
