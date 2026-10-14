@@ -203,11 +203,13 @@ def test_real_run_writes_the_captioned_dataset(capsys, fake_models, reference, t
     assert manifest["face_repair"]["mode"] == "off"
     assert len(manifest["images"]) == 16
     printed = capsys.readouterr().out
-    assert f"saved 16 images with captions to {out}" in printed
-    assert "quality: 16/16 images passed every check" in printed
+    assert f"The dataset is in {out}: 16 images, each with a caption." in printed
+    assert f"Quality: 16 of 16 images passed every check. Details: {out / 'report.json'}" in printed
+    assert f"  check the dataset  charlab eval {out} --reference {reference}" in printed
+    assert 'every caption starts with "mychar"' in printed
 
 
-def test_a_failed_image_is_regenerated_with_a_new_seed(fake_models, reference, tmp_path):
+def test_a_failed_image_is_regenerated_with_a_new_seed(capsys, fake_models, reference, tmp_path):
     FakeGate.fail_first_front = True
     out = tmp_path / "out"
 
@@ -220,6 +222,7 @@ def test_a_failed_image_is_regenerated_with_a_new_seed(fake_models, reference, t
     front = report["images"][0]
     assert [attempt["passed"] for attempt in front["attempts"]] == [False, True]
     assert front["kept_attempt"] == 2
+    assert "1 needed another try (001_turnaround_front.png)" in capsys.readouterr().out
 
 
 def test_zip_option_packs_the_dataset(capsys, fake_models, reference, tmp_path):
@@ -229,7 +232,7 @@ def test_zip_option_packs_the_dataset(capsys, fake_models, reference, tmp_path):
 
     with zipfile.ZipFile(tmp_path / "mychar.zip") as packed:
         assert len(packed.namelist()) == 34
-    assert "packed the dataset into" in capsys.readouterr().out
+    assert f"Packed into {tmp_path / 'mychar.zip'}" in capsys.readouterr().out
 
 
 def test_images_made_before_a_crash_are_kept(fake_models, monkeypatch, reference, tmp_path):
@@ -312,3 +315,10 @@ def test_eval_reports_a_missing_dataset_or_reference(capsys, reference, tmp_path
     Image.new("RGB", (64, 64)).save(data / "001.png")
     assert main(["eval", str(data), "--reference", "nope.png"]) == 2
     assert "nope.png: not found" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("seconds", "text"), [(48.4, "48 s"), (372, "6 min 12 s"), (3790, "1 h 3 min")]
+)
+def test_durations_read_naturally(seconds, text):
+    assert cli.duration(seconds) == text

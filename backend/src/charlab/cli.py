@@ -2,8 +2,10 @@
 
 import argparse
 import logging
+import shlex
 import sys
 import textwrap
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -18,16 +20,28 @@ from charlab.make import make_dataset, run_record
 from charlab.pipeline.caption import TRIGGER, FlorenceCaptioner, build_caption
 from charlab.pipeline.export import Export
 from charlab.pipeline.generate import QwenGenerator
-from charlab.pipeline.jobs import Job, plan
+from charlab.pipeline.jobs import Job, Result, plan
 from charlab.pipeline.prepare import InvalidReference, load_reference, prepare_reference
 from charlab.pipeline.stages import StageUnavailable
 from charlab.recipe import load_recipe
+
+EXAMPLES = """\
+examples:
+  charlab generate reference.png --trigger diana --dry-run
+      show the 16 shots, prompts and captions; needs no GPU
+  charlab generate reference.png --trigger diana
+      make the dataset in results/diana (needs an NVIDIA GPU)
+  charlab eval results/diana --reference reference.png
+      score a finished dataset; needs no GPU
+"""
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="charlab",
         description="Turn one character image into a training-ready LoRA dataset.",
+        epilog=EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", metavar="command")
@@ -81,6 +95,12 @@ def format_plan(jobs: Sequence[Job], header: Sequence[str], trigger: str) -> str
     return "\n".join(lines)
 
 
+def _log_progress() -> None:
+    """Show charlab's progress lines, without the model downloads' HTTP requests."""
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
 def _error(message: str, command: str = "generate") -> int:
     print(f"charlab {command}: error: {message}", file=sys.stderr)
     return 2
@@ -116,7 +136,8 @@ def _generate(args: argparse.Namespace) -> int:
         print(format_plan(jobs, header, args.trigger))
         return 0
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    _log_progress()
+    start = time.perf_counter()
     try:
         results = make_dataset(
             args.reference,
@@ -131,18 +152,60 @@ def _generate(args: argparse.Namespace) -> int:
     except (InvalidReference, StageUnavailable) as error:
         return _error(str(error))
 
-    print(f"saved {len(results)} images with captions to {out}")
-    failed = [r.job.key for r in results if r.check and r.check.failures]
-    print(f"quality: {len(results) - len(failed)}/{len(results)} images passed every check")
-    if failed:
-        print(f"failed all attempts (kept the best): {', '.join(failed)}")
-    if args.zip:
-        print(f"packed the dataset into {Export(out, jobs).zip()}")
+    export = Export(out, jobs)
+    packed = export.zip() if args.zip else None
+    print(finish(results, export, args, time.perf_counter() - start, packed))
     return 0
 
 
+def duration(seconds: float) -> str:
+    """6 min 12 s, 48 s or 1 h 3 min."""
+    minutes, rest = divmod(round(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours} h {minutes} min"
+    return f"{minutes} min {rest} s" if minutes else f"{rest} s"
+
+
+def finish(
+    results: Sequence[Result],
+    export: Export,
+    args: argparse.Namespace,
+    seconds: float,
+    packed: Path | None,
+) -> str:
+    """What the run made, how the checks went, and what to do with the dataset next."""
+    out, count = export.out, len(results)
+    lines = [
+        "",
+        f"Done in {duration(seconds)}. The dataset is in {out}: "
+        f"{count} images, each with a caption.",
+    ]
+    checked = [r for r in results if r.check]
+    if checked:
+        failed = [export.image_name(r.job) for r in checked if r.check.failures]
+        retried = [export.image_name(r.job) for r in checked if len(r.attempts) > 1]
+        quality = f"Quality: {count - len(failed)} of {count} images passed every check"
+        if retried:
+            quality += f"; {len(retried)} needed another try ({', '.join(retried)})"
+        lines.append(f"{quality}. Details: {out / 'report.json'}")
+        if failed:
+            lines.append(f"Failed every try, so the best one was kept: {', '.join(failed)}")
+    if packed:
+        lines.append(f"Packed into {packed}")
+    reference = shlex.quote(str(args.reference))
+    lines += [
+        "",
+        "Next:",
+        f"  check the dataset  charlab eval {shlex.quote(str(out))} --reference {reference}",
+        f"  train a LoRA       point ai-toolkit or kohya at {out}; every caption starts with "
+        f'"{args.trigger}"',
+    ]
+    return "\n".join(lines)
+
+
 def _evaluate(args: argparse.Namespace) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    _log_progress()
     try:
         settings = load_settings(args.config)
         dataset = load_dataset(args.dataset)
