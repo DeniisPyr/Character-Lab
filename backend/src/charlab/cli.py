@@ -1,18 +1,15 @@
 """Command-line interface for the ``charlab`` command."""
 
 import argparse
-import json
 import logging
 import sys
 import textwrap
 from collections.abc import Sequence
 from pathlib import Path
 
-import yaml
 from pydantic import ValidationError
 
 from charlab import __version__
-from charlab.ablation import InvalidPlan, load_plan, run_plan
 from charlab.config import load_settings
 from charlab.eval.dataset import InvalidDataset, load_dataset
 from charlab.eval.metrics import Scorer, summarise
@@ -60,22 +57,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate.add_argument("--config", type=Path, help="YAML file with settings to override")
 
-    ablate = commands.add_parser(
-        "ablate", help="compare settings: make and score a dataset per character and variant"
-    )
-    ablate.add_argument("--plan", type=Path, required=True, help="YAML file: variants and runs")
-    ablate.add_argument(
-        "--references", type=Path, required=True, help="folder with one reference per character"
-    )
-    ablate.add_argument(
-        "--out", type=Path, default=Path("results/ablation"), help="default: results/ablation"
-    )
-    ablate.add_argument(
-        "--config", type=Path, help="YAML file with settings to override in every run"
-    )
-    ablate.add_argument(
-        "--dry-run", action="store_true", help="list the runs without loading models"
-    )
     return parser
 
 
@@ -191,30 +172,6 @@ def _evaluate(args: argparse.Namespace) -> int:
     return 0
 
 
-def _ablate(args: argparse.Namespace) -> int:
-    try:
-        ablation = load_plan(args.plan, args.references, args.config)
-    except (OSError, yaml.YAMLError, ValidationError, InvalidPlan) as error:
-        return _error(str(error), "ablate")
-
-    print(f"{len(ablation.runs)} datasets, compared with {ablation.baseline!r}:")
-    for run in ablation.runs:
-        changes = json.dumps(run.variant.settings) if run.variant.settings else "defaults"
-        chain = "" if run.variant.chain else ", no earlier images as Picture 2"
-        done = (args.out / run.character / run.variant.name / "report.json").is_file()
-        print(f"  {run.character}/{run.variant.name}: {changes}{chain}{' (made)' if done else ''}")
-    if args.dry_run:
-        return 0
-
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
-    try:
-        paths = run_plan(ablation, args.out, args.config)
-    except (InvalidReference, InvalidDataset, StageUnavailable) as error:
-        return _error(str(error), "ablate")
-    print(f"wrote {' and '.join(str(path) for path in paths)}")
-    return 0
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -222,7 +179,5 @@ def main(argv: list[str] | None = None) -> int:
         return _generate(args)
     if args.command == "eval":
         return _evaluate(args)
-    if args.command == "ablate":
-        return _ablate(args)
     parser.print_help()
     return 0
