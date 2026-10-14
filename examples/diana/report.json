@@ -1,0 +1,394 @@
+{
+  "summary": {
+    "images": 16,
+    "passed": 16,
+    "retried": [],
+    "failed": [],
+    "near_duplicates": 0
+  },
+  "limits": {
+    "max_attempts": 3,
+    "same_character_below": 0.1785,
+    "min_face_px": 64,
+    "min_sharpness": 0.07,
+    "duplicate_max_bits": 2
+  },
+  "images": [
+    {
+      "image": "001_turnaround_front.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 42,
+          "passed": true,
+          "identity": 0.0078,
+          "face": {
+            "box": [
+              375,
+              61,
+              482,
+              176
+            ],
+            "size": 107,
+            "confidence": 0.846
+          },
+          "sharpness": 0.198,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "002_turnaround_three_quarter.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 43,
+          "passed": true,
+          "identity": 0.0097,
+          "face": {
+            "box": [
+              386,
+              49,
+              492,
+              167
+            ],
+            "size": 106,
+            "confidence": 0.86
+          },
+          "sharpness": 0.153,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "003_turnaround_side.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 44,
+          "passed": true,
+          "identity": 0.0273,
+          "face": {
+            "box": [
+              355,
+              56,
+              439,
+              179
+            ],
+            "size": 84,
+            "confidence": 0.826
+          },
+          "sharpness": 0.177,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "004_turnaround_back.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 45,
+          "passed": true,
+          "identity": 0.0625,
+          "face": null,
+          "sharpness": null,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "005_portrait_front.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 46,
+          "passed": true,
+          "identity": 0.0129,
+          "face": {
+            "box": [
+              404,
+              157,
+              661,
+              452
+            ],
+            "size": 257,
+            "confidence": 0.863
+          },
+          "sharpness": 2.041,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "006_portrait_three_quarter.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 47,
+          "passed": true,
+          "identity": 0.0151,
+          "face": {
+            "box": [
+              362,
+              163,
+              645,
+              484
+            ],
+            "size": 283,
+            "confidence": 0.853
+          },
+          "sharpness": 0.631,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "007_portrait_profile.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 48,
+          "passed": true,
+          "identity": 0.0406,
+          "face": {
+            "box": [
+              496,
+              179,
+              769,
+              552
+            ],
+            "size": 273,
+            "confidence": 0.789
+          },
+          "sharpness": 0.454,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "008_portrait_over_shoulder.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 49,
+          "passed": true,
+          "identity": 0.0146,
+          "face": {
+            "box": [
+              354,
+              128,
+              623,
+              419
+            ],
+            "size": 269,
+            "confidence": 0.848
+          },
+          "sharpness": 0.182,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "009_expressions_joy.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 50,
+          "passed": true,
+          "identity": 0.0204,
+          "face": {
+            "box": [
+              202,
+              112,
+              634,
+              571
+            ],
+            "size": 432,
+            "confidence": 0.813
+          },
+          "sharpness": 3.283,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "010_expressions_surprise.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 51,
+          "passed": true,
+          "identity": 0.0266,
+          "face": {
+            "box": [
+              347,
+              156,
+              720,
+              632
+            ],
+            "size": 373,
+            "confidence": 0.813
+          },
+          "sharpness": 3.334,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "011_expressions_anger.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 52,
+          "passed": true,
+          "identity": 0.0606,
+          "face": {
+            "box": [
+              365,
+              187,
+              783,
+              640
+            ],
+            "size": 418,
+            "confidence": 0.804
+          },
+          "sharpness": 2.713,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "012_expressions_sadness.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 53,
+          "passed": true,
+          "identity": 0.0246,
+          "face": {
+            "box": [
+              326,
+              200,
+              720,
+              621
+            ],
+            "size": 394,
+            "confidence": 0.801
+          },
+          "sharpness": 2.543,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "013_scenes_city_walk.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 54,
+          "passed": true,
+          "identity": 0.0258,
+          "face": {
+            "box": [
+              594,
+              55,
+              722,
+              189
+            ],
+            "size": 128,
+            "confidence": 0.853
+          },
+          "sharpness": 0.507,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "014_scenes_hilltop_sunset.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 55,
+          "passed": true,
+          "identity": 0.0224,
+          "face": {
+            "box": [
+              562,
+              87,
+              746,
+              272
+            ],
+            "size": 184,
+            "confidence": 0.849
+          },
+          "sharpness": 0.162,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "015_scenes_lantern_market.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 56,
+          "passed": true,
+          "identity": 0.0254,
+          "face": {
+            "box": [
+              557,
+              82,
+              721,
+              252
+            ],
+            "size": 164,
+            "confidence": 0.837
+          },
+          "sharpness": 0.188,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "image": "016_scenes_meadow_rest.png",
+      "passed": true,
+      "kept_attempt": 1,
+      "attempts": [
+        {
+          "seed": 57,
+          "passed": true,
+          "identity": 0.0251,
+          "face": {
+            "box": [
+              952,
+              143,
+              1144,
+              321
+            ],
+            "size": 178,
+            "confidence": 0.857
+          },
+          "sharpness": 0.421,
+          "failures": []
+        }
+      ]
+    }
+  ],
+  "near_duplicates": []
+}

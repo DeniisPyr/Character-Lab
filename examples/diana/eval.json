@@ -1,0 +1,400 @@
+{
+  "charlab": "0.3.0",
+  "dataset": "diana",
+  "reference": "reference.png",
+  "same_character_below": 0.1785,
+  "summary": {
+    "images": 16,
+    "identity": {
+      "mean": 0.0263,
+      "worst": 0.0625,
+      "worst_image": "004_turnaround_back.png",
+      "same_character": 16
+    },
+    "face_identity": {
+      "mean": 0.0247,
+      "worst": 0.0775,
+      "worst_image": "007_portrait_profile.png"
+    },
+    "consistency": {
+      "mean": 0.0433,
+      "worst": 0.1138,
+      "worst_pair": [
+        "004_turnaround_back.png",
+        "011_expressions_anger.png"
+      ]
+    },
+    "faces": {
+      "found": 15,
+      "missing": [
+        "004_turnaround_back.png"
+      ]
+    },
+    "face_size": {
+      "mean": 243.3333,
+      "worst": 84,
+      "worst_image": "003_turnaround_side.png"
+    },
+    "sharpness": {
+      "mean": 1.1325,
+      "worst": 0.1532,
+      "worst_image": "002_turnaround_three_quarter.png"
+    },
+    "diversity": {
+      "mean": 27.2,
+      "worst": 5,
+      "worst_pair": [
+        "002_turnaround_three_quarter.png",
+        "003_turnaround_side.png"
+      ]
+    },
+    "sizes": {
+      "832x1216": 4,
+      "1024x1024": 8,
+      "1280x720": 4
+    },
+    "captions": {
+      "captioned": 16,
+      "missing": [],
+      "orphans": [],
+      "trigger": "diana",
+      "with_trigger": 16,
+      "words": {
+        "min": 36,
+        "mean": 64.2,
+        "max": 91
+      },
+      "distinct": 16,
+      "need_cleaning": []
+    }
+  },
+  "images": [
+    {
+      "image": "001_turnaround_front.png",
+      "size": [
+        832,
+        1216
+      ],
+      "identity": 0.0078,
+      "face": {
+        "box": [
+          375,
+          61,
+          482,
+          176
+        ],
+        "size": 107,
+        "confidence": 0.846
+      },
+      "face_identity": 0.007,
+      "sharpness": 0.198,
+      "caption_words": 82
+    },
+    {
+      "image": "002_turnaround_three_quarter.png",
+      "size": [
+        832,
+        1216
+      ],
+      "identity": 0.0097,
+      "face": {
+        "box": [
+          386,
+          49,
+          492,
+          167
+        ],
+        "size": 106,
+        "confidence": 0.86
+      },
+      "face_identity": 0.0221,
+      "sharpness": 0.153,
+      "caption_words": 67
+    },
+    {
+      "image": "003_turnaround_side.png",
+      "size": [
+        832,
+        1216
+      ],
+      "identity": 0.0273,
+      "face": {
+        "box": [
+          355,
+          56,
+          439,
+          179
+        ],
+        "size": 84,
+        "confidence": 0.826
+      },
+      "face_identity": 0.0353,
+      "sharpness": 0.177,
+      "caption_words": 60
+    },
+    {
+      "image": "004_turnaround_back.png",
+      "size": [
+        832,
+        1216
+      ],
+      "identity": 0.0625,
+      "face": null,
+      "face_identity": null,
+      "sharpness": null,
+      "caption_words": 55
+    },
+    {
+      "image": "005_portrait_front.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "identity": 0.0129,
+      "face": {
+        "box": [
+          404,
+          157,
+          661,
+          452
+        ],
+        "size": 257,
+        "confidence": 0.863
+      },
+      "face_identity": 0.0028,
+      "sharpness": 2.041,
+      "caption_words": 51
+    },
+    {
+      "image": "006_portrait_three_quarter.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "identity": 0.0151,
+      "face": {
+        "box": [
+          362,
+          163,
+          645,
+          484
+        ],
+        "size": 283,
+        "confidence": 0.853
+      },
+      "face_identity": 0.0116,
+      "sharpness": 0.631,
+      "caption_words": 65
+    },
+    {
+      "image": "007_portrait_profile.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "identity": 0.0406,
+      "face": {
+        "box": [
+          496,
+          179,
+          769,
+          552
+        ],
+        "size": 273,
+        "confidence": 0.789
+      },
+      "face_identity": 0.0775,
+      "sharpness": 0.454,
+      "caption_words": 73
+    },
+    {
+      "image": "008_portrait_over_shoulder.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "identity": 0.0146,
+      "face": {
+        "box": [
+          354,
+          128,
+          623,
+          419
+        ],
+        "size": 269,
+        "confidence": 0.848
+      },
+      "face_identity": 0.0242,
+      "sharpness": 0.182,
+      "caption_words": 59
+    },
+    {
+      "image": "009_expressions_joy.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "identity": 0.0204,
+      "face": {
+        "box": [
+          202,
+          112,
+          634,
+          571
+        ],
+        "size": 432,
+        "confidence": 0.813
+      },
+      "face_identity": 0.0187,
+      "sharpness": 3.283,
+      "caption_words": 56
+    },
+    {
+      "image": "010_expressions_surprise.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "identity": 0.0266,
+      "face": {
+        "box": [
+          347,
+          156,
+          720,
+          632
+        ],
+        "size": 373,
+        "confidence": 0.813
+      },
+      "face_identity": 0.0057,
+      "sharpness": 3.334,
+      "caption_words": 53
+    },
+    {
+      "image": "011_expressions_anger.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "identity": 0.0606,
+      "face": {
+        "box": [
+          365,
+          187,
+          783,
+          640
+        ],
+        "size": 418,
+        "confidence": 0.804
+      },
+      "face_identity": 0.0373,
+      "sharpness": 2.713,
+      "caption_words": 42
+    },
+    {
+      "image": "012_expressions_sadness.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "identity": 0.0246,
+      "face": {
+        "box": [
+          326,
+          200,
+          720,
+          621
+        ],
+        "size": 394,
+        "confidence": 0.801
+      },
+      "face_identity": 0.0231,
+      "sharpness": 2.543,
+      "caption_words": 36
+    },
+    {
+      "image": "013_scenes_city_walk.png",
+      "size": [
+        1280,
+        720
+      ],
+      "identity": 0.0258,
+      "face": {
+        "box": [
+          594,
+          55,
+          722,
+          189
+        ],
+        "size": 128,
+        "confidence": 0.853
+      },
+      "face_identity": 0.0087,
+      "sharpness": 0.507,
+      "caption_words": 81
+    },
+    {
+      "image": "014_scenes_hilltop_sunset.png",
+      "size": [
+        1280,
+        720
+      ],
+      "identity": 0.0224,
+      "face": {
+        "box": [
+          562,
+          87,
+          746,
+          272
+        ],
+        "size": 184,
+        "confidence": 0.849
+      },
+      "face_identity": 0.0198,
+      "sharpness": 0.162,
+      "caption_words": 67
+    },
+    {
+      "image": "015_scenes_lantern_market.png",
+      "size": [
+        1280,
+        720
+      ],
+      "identity": 0.0254,
+      "face": {
+        "box": [
+          557,
+          82,
+          721,
+          252
+        ],
+        "size": 164,
+        "confidence": 0.837
+      },
+      "face_identity": 0.0545,
+      "sharpness": 0.188,
+      "caption_words": 91
+    },
+    {
+      "image": "016_scenes_meadow_rest.png",
+      "size": [
+        1280,
+        720
+      ],
+      "identity": 0.0251,
+      "face": {
+        "box": [
+          952,
+          143,
+          1144,
+          321
+        ],
+        "size": 178,
+        "confidence": 0.857
+      },
+      "face_identity": 0.022,
+      "sharpness": 0.421,
+      "caption_words": 89
+    }
+  ]
+}
