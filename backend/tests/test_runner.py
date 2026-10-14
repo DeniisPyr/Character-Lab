@@ -5,7 +5,7 @@ from PIL import Image
 
 from charlab.config import load_settings
 from charlab.pipeline.jobs import Check, Job, Repair, plan
-from charlab.pipeline.runner import RETRY_SEED_STEP, run
+from charlab.pipeline.runner import RETRY_SEED_STEP, run, time_left
 from charlab.pipeline.stages import Stages
 from charlab.recipe import load_recipe
 
@@ -240,3 +240,15 @@ def test_a_rejected_repair_leaves_the_original():
     assert results[0].image.getpixel((0, 0)) == (10, 0, 0)
     assert results[0].repair.kept is False
     assert results[0].check.identity == 0.01  # still the generated image's check
+
+
+@pytest.mark.parametrize(
+    ("seconds", "done", "remaining", "text"),
+    [
+        (60, 4, 10, "about 3 min left"),
+        (16, 2, 3, "under a minute left"),
+        (100, 10, 0, ""),
+    ],
+)
+def test_time_left_follows_the_pace_so_far(seconds, done, remaining, text):
+    assert time_left(seconds, done, remaining) == text
