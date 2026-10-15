@@ -17,6 +17,6 @@ charlab generate reference.png --trigger diana
 images side by side.
 
 **How it was made:** on an A100 80 GB with the CUDA 12.6 build of PyTorch, in October 2026, by
-charlab 0.2.0.dev0, whose settings are the same as 0.3.0's defaults. The same seed on the
+charlab 0.2.0.dev0, whose settings are the same as 1.0.0's defaults. The same seed on the
 CUDA 13 build gives close variations, not identical images. The manifest names the reference
 `Stuff_00020_.png`, its original file name.
