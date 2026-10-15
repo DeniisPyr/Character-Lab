@@ -1,0 +1,8 @@
+# For a GPU with 24 GB of memory, such as an RTX 3090 or 4090:
+#
+#   charlab generate reference.png --trigger diana --config 24gb.yaml
+#
+# Runs a quantized transformer and moves each model to the GPU only while it runs. Needs about
+# 48 GB of system RAM.
+generation:
+  transformer: gguf

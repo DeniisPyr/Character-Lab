@@ -1,7 +1,8 @@
 """Pipeline settings: which models to use and how to sample.
 
 Defaults live in configs/default.yaml. A user config only needs the values it changes; it is
-merged over the defaults key by key, and validated as a whole.
+merged over the defaults key by key, and validated as a whole. Ready-made configs, such as
+24gb.yaml, sit next to the defaults and can be passed by name.
 """
 
 from pathlib import Path
@@ -11,7 +12,8 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # The package runs from a checkout (pip install -e), so the configs sit next to src/.
-DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "default.yaml"
+CONFIGS = Path(__file__).resolve().parents[2] / "configs"
+DEFAULT_CONFIG = CONFIGS / "default.yaml"
 # Keys holding file paths, resolved relative to the YAML file that sets them.
 PATH_KEYS = ("recipe",)
 
@@ -110,10 +112,19 @@ def _read(path: Path) -> dict:
     return data
 
 
+def find_config(path: str | Path) -> Path:
+    """`path`, or for a bare file name that isn't here, the ready-made config of that name."""
+    path = Path(path)
+    ready_made = CONFIGS / path.name
+    if not path.exists() and path.name == str(path) and ready_made.is_file():
+        return ready_made
+    return path
+
+
 def load_settings(
     override: str | Path | None = None, defaults: str | Path = DEFAULT_CONFIG
 ) -> Settings:
     data = _read(Path(defaults))
     if override is not None:
-        data = merge(data, _read(Path(override)))
+        data = merge(data, _read(find_config(override)))
     return Settings.model_validate(data)

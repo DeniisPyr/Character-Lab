@@ -125,8 +125,19 @@ def test_dry_run_prints_the_plan(capsys, reference):
     assert "+ portrait/front" in out
     assert "Show the character's full body standing upright" in out
     assert "caption: mychar, full body, front view, standing, plain white background." in out
+    assert "mode:      80 GB GPU (bf16)" in out
     assert "quality:   anime checks, up to 3 attempts per image" in out
     assert "repair:    off" in out
+
+
+def test_the_24gb_config_works_from_any_folder(capsys, reference, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    assert (
+        main(["generate", reference, "--trigger", "mychar", "--config", "24gb.yaml", "--dry-run"])
+        == 0
+    )
+    assert "mode:      24 GB GPU (gguf)" in capsys.readouterr().out
 
 
 def test_dry_run_uses_description_out_and_config(capsys, reference, tmp_path):

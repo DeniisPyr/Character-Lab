@@ -33,6 +33,8 @@ examples:
       show the 16 shots, prompts and captions; needs no GPU
   charlab generate reference.png --trigger diana
       make the dataset in results/diana (needs an NVIDIA GPU)
+  charlab generate reference.png --trigger diana --config 24gb.yaml
+      the same on a GPU with 24 GB of memory
   charlab eval results/diana --reference reference.png
       score a finished dataset; needs no GPU
 """
@@ -54,7 +56,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--trigger", required=True, help="trigger word that starts every caption, e.g. mychar"
     )
     generate.add_argument("--out", type=Path, help="output folder (default: results/<trigger>)")
-    generate.add_argument("--config", type=Path, help="YAML file with settings to override")
+    generate.add_argument(
+        "--config", type=Path, help="YAML file with settings to override; 24gb.yaml for a 24 GB GPU"
+    )
     generate.add_argument(
         "--description",
         help="optional sentence about the character's style and outfit, added to every prompt",
@@ -126,6 +130,8 @@ def _generate(args: argparse.Namespace) -> int:
             f"reference: {args.reference} ({reference.width}x{reference.height}, checked)",
             f"trigger:   {args.trigger}",
             f"output:    {out}",
+            f"mode:      {'24' if settings.generation.transformer == 'gguf' else '80'} GB GPU "
+            f"({settings.generation.transformer})",
             f"quality:   {settings.style} checks, up to {settings.quality.max_attempts} "
             "attempts per image",
             "repair:    "
