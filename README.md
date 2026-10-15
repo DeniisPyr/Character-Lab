@@ -12,368 +12,192 @@
   <a href="https://deniispyr.github.io/Character-Lab/"><img src="https://img.shields.io/badge/example-see_a_real_run-2ea44f" alt="Example: see a real run"></a>
 </p>
 
-From a single reference image, Character Lab generates 16 consistent images of the same
-character with [Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511),
-captions each one, and writes them as image/caption pairs ready for a LoRA trainer:
+Give Character Lab one image of your character. It makes 16 new images of the same character
+in four kinds of shots with [Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511),
+checks each one, captions it, and writes image/caption pairs ready for a LoRA trainer such as
+ai-toolkit or kohya.
 
-| View | Images | Size |
+<p align="center">
+  <a href="https://deniispyr.github.io/Character-Lab/"><img src="examples/preview.jpg" alt="One reference image of Diana, a woman with long dark curly hair in an oversized cream sweater, and the 16 images made from it: four full-body views, four portraits, four expressions and four scenes"></a>
+</p>
+
+<p align="center"><sub>A real run with the default settings, not retouched. Every image, with its caption and
+scores, is on the <a href="https://deniispyr.github.io/Character-Lab/">showcase page</a> and in
+<a href="examples/diana">examples/diana</a>.</sub></p>
+
+## Quick start
+
+You need Python 3.11+ and an NVIDIA GPU with 80 GB of memory, or 24 GB in the quantized mode
+(see [Requirements](#requirements)). On macOS or Linux:
+
+```sh
+git clone https://github.com/DeniisPyr/Character-Lab.git
+cd Character-Lab
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e './backend[gpu]'
+
+charlab generate reference.png --trigger diana   # the dataset, in results/diana
+```
+
+## What you get
+
+16 images in four kinds of shots:
+
+| Shots | Images | Size |
 |---|---|---|
 | Turnaround | front, three-quarter, side, back | 832×1216 |
 | Portrait | front, three-quarter, profile, over the shoulder | 1024×1024 |
 | Expressions | joy, surprise, anger, sadness | 1024×1024 |
 | Scenes | city walk, hilltop sunset, lantern market, meadow | 1280×720 |
 
-> **Status: work in progress.** The full pipeline works and is tested on a GPU: preparing the
-> reference, generating, checking quality, captioning and exporting the dataset. Face repair
-> is included but experimental and off by default (see
-> [Face repair](#face-repair-experimental)). A second command scores a finished dataset (see
-> [Evaluation](#evaluation)). Comparing settings across several characters comes next.
-
-## How it works
-
-1. **Prepare.** The reference is checked (format, size, integrity) and cropped to the
-   character.
-   - No model is needed when the background is transparent or one plain colour.
-   - Otherwise [rembg](https://github.com/danielgatis/rembg) with BiRefNet cuts the character
-     out and puts it on white.
-2. **Generate.** Each image is an instruction-style edit of the reference (Picture 1).
-   Later views also get an earlier result as Picture 2, for example the front view for
-   the back view, which keeps the outfit and face consistent. The dataset is described in
-   a YAML recipe, [backend/configs/recipes/lora-character.yaml](backend/configs/recipes/lora-character.yaml).
-   The Lightning LoRA cuts sampling to 4 steps. Each image is saved as soon as it is made.
-3. **Check.** A quality gate scores each image as soon as it is made: is it the same
-   character, and is the face there, big enough and sharp? A failed image is made again with
-   a new seed (see [Quality gate](#quality-gate)). An experimental face repair, off by
-   default, can then redraw a face that still fails.
-4. **Caption.** The generator frees the GPU, then
-   [Florence-2](https://huggingface.co/florence-community/Florence-2-large) describes each
-   image. The caption is the trigger word, then tags from the recipe, then the cleaned
-   description.
-   - **The tags** state what Florence-2 often gets wrong: the view, the framing and the
-     expression.
-   - **The cleanup** removes the character's fixed look (hair, eye colour, skin), guesses
-     about the person and filler. That way the look binds to the trigger word, while the
-     outfit, pose and background stay described.
-5. **Export.** Numbered image/caption pairs, a `manifest.json` and a `report.json` (see
-   [Output](#output)).
-
-A separate command, `charlab eval`, scores a finished dataset on the CPU (see
-[Evaluation](#evaluation)).
-
-Every image has its own seed, so a run is reproducible: the same reference, seed and
-settings give byte-identical images on the same GPU model and torch CUDA build. Repeat runs on
-three A100 machines with CUDA 13 matched exactly. An A100 with the CUDA 12.6 build gave close
-variations instead: the same character, pose and composition, with small details such as
-background shapes changed. The two builds' math libraries round slightly differently, and
-diffusion amplifies that.
-
-## Requirements
-
-| What you want to do | What you need |
-|---|---|
-| Install, run the tests, print the plan (`--dry-run`) | Python 3.11+ on Linux, macOS or Windows |
-| Score a finished dataset (`charlab eval`) | The same, no GPU. About 200 MB of models, more if the reference's background needs removing |
-| Generate images | An NVIDIA GPU, plus disk space for the models (see below) |
-
-Generation has two modes, set with `generation.transformer`:
-
-| | `bf16` (default) | `gguf` |
-|---|---|---|
-| GPU | 80 GB (A100, H100) | 24 GB (RTX 3090, RTX 4090) |
-| What runs | the full model, all on the GPU | a [quantized transformer](https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF) (Q6_K); each model moves to the GPU only while it runs |
-| Peak GPU memory | 61.4 GiB | 21.0 GiB |
-| First download | about 60 GB | about 36 GB |
-| Full run, 16 images with captions | 6.5–15 min: 3.5–11.5 min loading, 2–2.5 min generating and checking, 0.5–1 min captioning | 16–18 min: 3–4 min loading, 10.5–13 min generating, 1 min captioning |
-
-**About these numbers:**
-- **Where they come from:** runs on A100 80 GB GPUs, in October 2026. The `gguf` numbers come
-  from the same A100s with PyTorch limited to 23 GiB of GPU memory, to act like a 24 GB card.
-  Times on a real RTX 4090 will differ.
-- **Loading time** depends mostly on the machine: the same A100 type took 3.5 minutes on one
-  host and 11.5 on another.
-- **Captioning** needs only 2.4 GiB of GPU memory, because the generator frees the GPU first.
-- **Quality:** side by side, the `gguf` images look the same as the `bf16` ones.
-- **System RAM:** in `gguf` mode the models wait in system RAM between uses, so plan for about
-  48 GB of RAM. This is an estimate, not yet measured on a home PC.
-
-Generation is tested on Linux. Windows with an NVIDIA GPU should work, but is untested. Macs
-have no NVIDIA GPU, so they can run the dry run, the tests and `charlab eval`, but not
-generation.
-
-## Install
-
-macOS / Linux:
-
-```sh
-git clone https://github.com/DeniisPyr/Character-Lab.git
-cd Character-Lab
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e './backend[gpu]'     # everything, on a machine with an NVIDIA GPU
-# or './backend[eval]' to only score datasets, or './backend' for the dry run and tests
-```
-
-Windows (PowerShell):
-
-```powershell
-git clone https://github.com/DeniisPyr/Character-Lab.git
-cd Character-Lab
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-# PyPI's torch for Windows has no GPU support; install a CUDA build first.
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
-pip install -e "./backend[gpu]"
-```
-
-**Which torch build:**
-- On Linux, the default torch from PyPI is built for CUDA 13 and needs NVIDIA driver 580 or
-  newer.
-- With an older driver (`nvidia-smi` shows a CUDA version below 13), install the CUDA 12.6
-  build before the package:
-  `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126`.
-- If something doesn't match, `charlab generate` stops before downloading anything and
-  prints the command that fixes it.
-
-## Usage
-
-```sh
-# Print the 16-image plan with every prompt and seed. Loads no models.
-charlab generate path/to/reference.png --trigger mychar --dry-run
-
-# Generate and caption the dataset into results/mychar/
-charlab generate path/to/reference.png --trigger mychar
-
-# Score the dataset; writes eval.json and eval.md into results/mychar/
-charlab eval results/mychar --reference path/to/reference.png
-```
-
-Options:
-
-| Option | What it does |
-|---|---|
-| `--trigger WORD` | required; the word that will call up the character in the trained LoRA. It will start every caption, and it names the output folder. |
-| `--out DIR` | output folder (default `results/<trigger>`) |
-| `--config FILE` | a YAML file with the settings to change |
-| `--description "..."` | a sentence about the character's style or outfit, added to every prompt |
-| `--zip` | also pack the dataset into `<out>.zip` |
-
-On a **24 GB GPU**, create a file `24gb.yaml`:
-
-```yaml
-generation:
-  transformer: gguf
-```
-
-and add `--config 24gb.yaml`. Every default is in
-[backend/configs/default.yaml](backend/configs/default.yaml), with comments. A config file
-only needs the values it changes.
-
-**The first real run downloads the models:**
-- **Where:** Hugging Face models go to the cache in `HF_HOME` (default
-  `~/.cache/huggingface`); the background-removal model goes to `REMBG_HOME` (default
-  `~/.u2net`).
-- **Downloading in advance:** to fetch the default models before running, use
-  `hf download Qwen/Qwen-Image-Edit-2511`,
-  `hf download lightx2v/Qwen-Image-Edit-2511-Lightning Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors`
-  and `hf download florence-community/Florence-2-large`. The quality gate's two small models
-  (about 200 MB) download on first use.
-- **On RunPod:** the PyTorch template sets `HF_HUB_ENABLE_HF_TRANSFER=1` without installing
-  `hf_transfer`, which makes every download fail. Run `unset HF_HUB_ENABLE_HF_TRANSFER`
-  first.
-
-### The reference image
-
-- **One character**, ideally full body and facing the camera.
-- **Background:** transparent or one plain colour works best and needs no extra model. Busy
-  backgrounds are removed automatically.
-- **Format and size:** PNG, JPEG or WebP; the shorter side at least 512 px; at most 20 MB and
-  25 megapixels.
-
-Use characters you created or have the rights to. Don't use photos of real people without
-their consent.
-
-## Output
+They are written as numbered image/caption pairs:
 
 ```
-results/mychar/
+results/character_name/
   001_turnaround_front.png         the image
   001_turnaround_front.txt         its caption
   ...
   016_scenes_meadow_rest.png
   016_scenes_meadow_rest.txt
-  manifest.json                    the run's settings and models; seed, prompt and caption per image
-  report.json                      the quality gate's scores for every attempt at every image
-results/mychar.zip                 with --zip
+  manifest.json                    settings, seeds, prompts and captions
+  report.json                      quality check scores
+results/character_name.zip         with --zip
 ```
 
-LoRA trainers such as ai-toolkit and kohya pair each image with the `.txt` file of the same
-name. A caption, for example `002_turnaround_three_quarter.txt`:
+LoRA trainers pair each image with the `.txt` file of the same name. A caption is the trigger
+word, the shot, then a description of the image.
 
-> mychar, full body, three-quarter view, standing, plain white background. The image is a
-> full-length portrait of a young woman standing in a relaxed pose. She is wearing a beige
-> off-the-shoulder dress with long sleeves and a round neckline. The dress is made of a soft,
-> lightweight fabric and has a relaxed fit. She has a neutral expression on her face and is
-> looking directly at the camera.
+> What the captions never describe, the LoRA learns as part of `character_name`; what they do
+> describe, such as the outfit, the pose and the background, stays yours to change in a prompt.
 
-The hair is left out on purpose, so it binds to `mychar`. Each caption's tags are set in the
-recipe; `--dry-run` shows how each caption will start.
+## Requirements
 
-## Quality gate
+- **Python 3.11 or newer**, on Linux, macOS or Windows.
+- **An NVIDIA GPU** to generate images. Pick the mode that fits your card:
 
-Each image is scored right after it is generated. Both models are small and run on the CPU
-with ONNX Runtime, adding well under a second per image.
-
-| Check | Passes when | Measured on one character's 16 images |
+| | Standard (default) | 24 GB mode (`gguf`) |
 |---|---|---|
-| Same character ([CCIP](https://huggingface.co/deepghs/ccip_onnx), whole image vs the reference) | difference below 0.1785 | 0.008–0.063; 12 other anime characters scored 0.32–0.48 |
+| GPU memory | 80 GB, such as an A100 or H100 | 24 GB, such as an RTX 3090 or 4090 |
+| One dataset takes | 6.5–15 min | 16–18 min |
+| First download | about 60 GB | about 36 GB |
+
+**On a 24 GB GPU**, add `--config 24gb.yaml`:
+
+```sh
+charlab generate reference.png --trigger diana --config 24gb.yaml
+```
+
+**Good to know:**
+- **Most of a run is loading the model.** That depends on the machine: from 3.5 to 11.5
+  minutes on the same type of GPU.
+- **GPU memory, standard mode:** about 40 GB on average over a run, and 61 GB at the peak,
+  while generating.
+- **GPU memory, 24 GB mode:** about 11 GB on average over a run, and 21 GB at the peak, so it
+  fits a 24 GB card.
+
+## Quality checks
+
+Each image is scored right after it is made. Both models are small and run on the CPU, adding
+well under a second per image.
+
+| Check | Passes when | Measured on the example's 16 images |
+|---|---|---|
+| Same character ([CCIP](https://huggingface.co/deepghs/ccip_onnx), whole image vs the reference) | difference below 0.1785 | 0.008–0.062 |
 | Face present ([anime face detector](https://huggingface.co/deepghs/anime_face_detection)) | a face is found; the recipe marks shots from behind as having none | found in all 15 front-facing shots |
-| Face size | shorter side of at least 64 px | 79–423 px |
-| Face sharpness | at least 0.07× the reference face's (variance of the Laplacian) | 0.14× and up; a blurred copy scored 0.02× |
+| Face size | shorter side of at least 64 px | 84–432 px |
+| Face sharpness | at least 0.07× the reference face's | 0.15× and up |
 
 **When a check fails:**
 - The image is made again with the seed plus 1000, up to 3 tries.
-- This happens before the next image, so later shots that use it as Picture 2 get the kept
-  version.
-- If no try passes, the best one is kept and listed in the summary.
+- This happens before the next image, so later shots built on it use the kept version.
+- If no try passes, the best one is kept and named in the summary at the end.
 
 **`report.json`** records every try: its seed, scores, face box and failure reasons. It also
-lists near-exact copies, found with a 64-bit image fingerprint. These are reported, not
-rejected: distinct shots on a white background can be as close as 5 bits, so a fingerprint
-can only catch true copies.
+lists near-exact copies of another image, found with an image fingerprint.
 
 **Changing the limits:** they are under `quality:` in
-[backend/configs/default.yaml](backend/configs/default.yaml). The models suit anime and
-illustrated characters (`style: anime`, the only style so far). A realistic style with its
-own detector and identity model is planned.
+[backend/configs/default.yaml](backend/configs/default.yaml).
 
-## Face repair (experimental)
+## Known limits
 
-Off by default. Switched on, it redraws a weak face with the same Qwen model, right after the
-quality gate and before the next image is made.
+- **The same-character check is loose for semi-realistic characters.** CCIP was made for
+  anime characters, where 12 other characters scored 0.32–0.48, far above the limit. Across
+  six semi-realistic characters, 65% of pairs of *different* characters still scored below
+  it, and no lower limit worked for all six. The check catches broken images and very
+  different characters, but not drift: a grim reaper's skull became a human face in some
+  close-ups, another character lost her tentacles in most shots, and every one of those
+  images passed. Look through the images before you train. A better check is in progress.
+- **The face checks suit anime and illustrated faces.** A realistic style with its own
+  detector and identity model is planned.
+- **Face repair is experimental and off by default** (see
+  [Face repair](#face-repair-experimental)).
+- **Generation was measured on A100 GPUs only.** The 24 GB numbers come from an A100 limited
+  to 23 GiB, not from a real 24 GB card.
 
-**How it works:**
-1. The face is cut out at 2.2× its size and scaled to 1024 px, so the model sees a close-up.
-2. The model redraws the close-up (Picture 1): the same framing, head angle, pose,
-   expression, hair and lighting, with sharper detail in the face. A close-up of the
-   reference's face goes in as Picture 2.
-3. The result is scaled back and blended in through a soft oval over the face. Nothing
-   outside the oval changes.
-4. The repaired image goes through the gate again. It replaces the original only if:
+## Scoring a dataset
 
-| Check | Limit |
-|---|---|
-| Layout (16×16 greyscale thumbnails, correlation) | at least 0.95 |
-| Face position | moved at most 0.25× the face's size |
-| Face sharpness | higher than before |
-| CCIP difference | at most 0.01 worse than before |
-| Gate failures | none added |
+`charlab eval` scores a finished dataset against its reference, on the CPU, in about 15
+seconds for 16 images on a Mac. It reads any folder of image/caption pairs, so it also works
+for comparing two runs, or a dataset made with another tool. It writes `eval.md` (tables) and
+`eval.json` (every number) into the folder, and prints a summary:
 
-`report.json` records every repair, kept or rejected, with the reason.
-
-**To switch it on**, set the mode in a config passed with `--config`:
-
-```yaml
-face_repair:
-  mode: failed   # faces that fail every attempt; `small` also redraws faces under 128 px
+```text
+Scored 16 images against reference.png.
+Same character: 16 of 16. Faces found: 15 of 16. Captioned: 16 of 16.
+Details: results/diana/eval.md (every number is in eval.json)
 ```
-
-**What was measured.** Three methods were compared on a GPU. Qwen's inpainting pipeline and
-an anime SDXL model did not restore a blurred face, so this edit-a-close-up method was
-chosen. It was then tested on faces from a real run, damaged on purpose. The table compares
-repairs with the reference's face as Picture 2 (`use_reference: true`, the default) and
-without it. The face-crop CCIP compares the face alone with the reference's face; the gate's
-whole-image CCIP barely reacts to the face.
-
-| Face | Sharpness: before → with / without reference | Face-crop CCIP: before → with / without reference |
-|---|---|---|
-| Front view, undamaged | 0.24 | 0.006 |
-| Front view, shrunk to 1/8 and enlarged back | 0.01 → 0.39 / 0.42 | 0.202 → 0.004 / 0.020 |
-| Front view, JPEG at quality 8 | 0.16 → 0.25 / 0.38 | 0.113 → 0.025 / 0.034 |
-| Hilltop scene, undamaged | 0.29 | 0.016 |
-| Hilltop scene, shrunk to 1/8 and enlarged back | 0.05 → 0.23 / 0.45 | 0.154 → 0.015 / 0.028 |
-| Hilltop scene, JPEG at quality 8 | 0.22 → 0.26 / 0.43 | 0.063 → 0.010 / 0.016 |
-
-By these numbers every repair is a success, and the guard kept all of them.
-
-**Why it is off by default:**
-- **It changes fine facial features, and no check can see it.** Without the reference, the
-  repairs opened the heavy-lidded brown eyes wider, turned the irises grey-green and drew
-  thicker, darker brows. With the reference, the eyes stayed closer, but on the JPEG face the
-  hair inside the oval turned near-black. CCIP still scored every one as the same
-  character, and sharpness even rose. A LoRA trained on such faces learns a slightly
-  different face.
-- **The reference pulls side views to the front.** With it, side profiles came back closer
-  to a front face (layout 0.77–0.81), so the guard rejected them.
-- **It rarely has anything to do.** In every full run, all 16 images passed the gate, so
-  `failed` mode never ran.
-- **The gate misses blocky faces.** JPEG block edges count as detail: the front face at
-  quality 8 scored 0.16× sharpness, above the 0.07× limit, so `failed` mode never sees it.
-  The face-crop CCIP does react (0.113 vs 0.006 clean); calibrating it as a check needs more
-  characters.
-
-## Evaluation
-
-`charlab eval` scores a finished dataset against its reference. It runs on the CPU with the
-quality gate's models, in about 15 seconds for 16 images on a Mac. It reads any folder of
-image/caption pairs, so it can also compare runs, settings, or datasets made with other tools.
-It writes `eval.json` (every number) and `eval.md` (the same as tables) into the folder.
 
 | Score | What it measures | Better |
 |---|---|---|
-| Identity | CCIP difference between each image and the reference, as in the quality gate | lower |
+| Identity | CCIP difference between each image and the reference, as in the quality checks | lower |
 | Face identity | CCIP difference between each face, cut out, and the reference's face | lower |
-| Consistency | CCIP difference between every two images of the dataset | lower |
-| Face size and sharpness | as in the quality gate | higher |
+| Consistency | CCIP difference between every two images | lower |
+| Face size and sharpness | as in the quality checks | higher |
 | Diversity | how many of 64 fingerprint bits differ between two images | higher |
 | Captions | missing captions, captions without an image, the trigger word, length, duplicates, and captions that still describe the character's fixed look | – |
 
-Each score gives its mean and its worst image or pair, so it's clear which image to look at
-first.
+Each score gives its mean and its worst image or pair, so you know which image to look at
+first. The example's scores are in [examples/diana/eval.md](examples/diana/eval.md).
 
-**A dataset made with the default settings** (an A100 run, October 2026):
+**Read the scores as a comparison**, not as a verdict: only whole-image identity has a limit,
+and it is loose for semi-realistic characters (see [Known limits](#known-limits)). The face
+score catches damaged faces but not small changes to the features, and the fingerprint sees
+the layout and brightness, not the pose or expression.
 
-| Score | Mean | Worst | Worst image or pair |
-|---|---|---|---|
-| Identity | 0.026 | 0.062 | back view |
-| Face identity | 0.025 | 0.077 | profile portrait |
-| Consistency | 0.043 | 0.114 | back view and anger close-up |
-| Face size, px | 243 | 84 | side view |
-| Face sharpness | 1.13× | 0.15× | three-quarter view |
-| Diversity, bits | 27.2 | 5 | three-quarter and side views |
+## Face repair (experimental)
 
-All 16 images count as the same character, faces were found in all but the back view, and
-all 16 captions start with the trigger word and leave out the character's fixed look.
+Off by default. Switched on, it redraws a face that fails the checks, with the same Qwen
+model:
+1. The face is cut out at 2.2× its size and scaled up, so the model sees a close-up.
+2. The model redraws the close-up with sharper detail and the same framing, pose,
+   expression, hair and lighting. It also sees a close-up of the reference's face.
+3. The result is blended back through a soft oval over the face; nothing outside it changes.
+4. The repaired image replaces the original only if the layout, the face position, the
+   sharpness and the identity score all still hold. `report.json` records every repair, kept
+   or rejected.
 
-**Limits:**
-- **The face score catches damaged faces, not changed features.** On a front face blurred or
-  JPEG-damaged on purpose, it rose from 0.006 to 0.076–0.202. But on four real faces redrawn
-  by face repair without the reference, the kind of repair that changed the eyes and brows
-  (see [Face repair](#face-repair-experimental)), it moved by 0.003 at most.
-- **Only whole-image CCIP has a limit** (0.1785, from CCIP's authors). Face identity,
-  consistency and diversity are measured but not judged, until more characters give a
-  baseline.
-- **Diversity is coarse.** A 64-bit fingerprint sees the layout and brightness, not the pose
-  or expression: a front and a back view on white differ in only 5 bits.
-- **Anime only**, like the quality gate.
+To switch it on, add to a config passed with `--config`:
 
-## Development
-
-```sh
-pip install -e './backend[dev]'
-pre-commit install                  # ruff and commit-message checks on every commit
-cd backend
-python -m pytest
-python -m ruff check . && python -m ruff format --check .
+```yaml
+face_repair:
+  mode: failed   # faces that fail every try; `small` also redraws faces under 128 px
 ```
 
-The tests replace the models with fakes, so they run in seconds without a GPU. CI runs them
-on Linux, macOS and Windows.
+**Why it is off:**
+- **It changes fine facial features, and no check sees it.** In tests it restored blurred
+  and JPEG-damaged faces, but without the reference's face it also opened the eyes wider,
+  turned brown irises grey-green and thickened the brows, while every score said the face
+  was fine. A LoRA trained on such faces learns a slightly different face.
+- **It pulls side views toward the front**, so most side-view repairs are rejected.
+- **It rarely has anything to do.** With the default settings, 1 of the 64 images of four
+  characters failed every try: a backlit face at sunset, scored as too blurry.
+
 
 ## Models and licenses
 
-The code is MIT-licensed ([LICENSE](LICENSE)). The quality gate's image preprocessing follows
-DeepGHS's [imgutils](https://github.com/deepghs/imgutils) (MIT). It downloads these models at
-run time:
+The code is MIT-licensed ([LICENSE](LICENSE)). The quality checks' image preprocessing
+follows DeepGHS's [imgutils](https://github.com/deepghs/imgutils) (MIT). Character Lab
+downloads these models at run time:
 
 | Model | Used for | License |
 |---|---|---|
@@ -381,6 +205,6 @@ run time:
 | [lightx2v/Qwen-Image-Edit-2511-Lightning](https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning) | 4-step sampling | Apache-2.0 |
 | [unsloth/Qwen-Image-Edit-2511-GGUF](https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF) | `gguf` mode | Apache-2.0 |
 | [florence-community/Florence-2-large](https://huggingface.co/florence-community/Florence-2-large) | captions | MIT |
-| [deepghs/anime_face_detection](https://huggingface.co/deepghs/anime_face_detection) (`face_detect_v1.4_s`) | quality gate: faces | MIT |
-| [deepghs/ccip_onnx](https://huggingface.co/deepghs/ccip_onnx) (`ccip-caformer-24-randaug-pruned`) | quality gate: identity | OpenRAIL |
+| [deepghs/anime_face_detection](https://huggingface.co/deepghs/anime_face_detection) (`face_detect_v1.4_s`) | quality checks: faces | MIT |
+| [deepghs/ccip_onnx](https://huggingface.co/deepghs/ccip_onnx) (`ccip-caformer-24-randaug-pruned`) | quality checks: identity | OpenRAIL |
 | [BiRefNet](https://github.com/ZhengPeng7/BiRefNet), via rembg (`birefnet-general`) | background removal | MIT |
