@@ -17,7 +17,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "examples" / "diana"
 REFERENCE = ROOT / "examples" / "reference.png"
-PAGE = ("index.html", "styles.css", "app.js")
+PAGE = ("index.html", "styles.css", "app.js", "icon.svg")
 # The datasets' PNGs are about 1 MB each; WebP at this size keeps the page under 1 MB.
 LONG_SIDE = 1280
 QUALITY = 82

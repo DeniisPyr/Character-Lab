@@ -81,29 +81,13 @@ code {
   letter-spacing: -0.03em;
 }
 
+/* The icon has a transparent margin around its tile; the negative margin lines the tile up. */
 .brand-mark {
-  display: grid;
-  grid-template-columns: repeat(3, 4px);
-  gap: 2px;
-  align-items: end;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 4px;
-  border: 1px solid #3b463e;
-  border-radius: 8px;
-  background: #101612;
-}
-
-.brand-mark span {
   display: block;
-  border-radius: 3px;
-  background: var(--accent);
+  width: 34px;
+  height: 34px;
+  margin: -4px;
 }
-
-.brand-mark span:nth-child(1) { height: 8px; }
-.brand-mark span:nth-child(2) { height: 15px; }
-.brand-mark span:nth-child(3) { height: 11px; }
 
 .header-links {
   display: flex;
