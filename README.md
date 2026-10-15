@@ -1,8 +1,16 @@
-# Character Lab
+<p align="center">
+  <img src="frontend/icon.png" width="160" height="160" alt="Character Lab icon">
+</p>
 
-[![CI](https://github.com/DeniisPyr/Character-Lab/actions/workflows/ci.yml/badge.svg)](https://github.com/DeniisPyr/Character-Lab/actions/workflows/ci.yml)
+<h1 align="center">Character Lab</h1>
 
-Turns one character image into a training-ready LoRA dataset.
+<p align="center"><strong>One character image in, a training-ready LoRA dataset out.</strong></p>
+
+<p align="center">
+  <a href="https://github.com/DeniisPyr/Character-Lab/actions/workflows/ci.yml"><img src="https://github.com/DeniisPyr/Character-Lab/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/DeniisPyr/Character-Lab/releases/latest"><img src="https://img.shields.io/github/v/release/DeniisPyr/Character-Lab?label=release" alt="Latest release"></a>
+  <a href="https://deniispyr.github.io/Character-Lab/"><img src="https://img.shields.io/badge/example-see_a_real_run-2ea44f" alt="Example: see a real run"></a>
+</p>
 
 From a single reference image, Character Lab generates 16 consistent images of the same
 character with [Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511),
