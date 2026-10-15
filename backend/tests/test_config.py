@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from charlab.config import load_settings, merge
+from charlab.config import CONFIGS, find_config, load_settings, merge
 from charlab.recipe import load_recipe
 
 
@@ -78,3 +78,26 @@ def test_merge_is_deep_and_leaves_inputs_unchanged():
 def test_a_bare_off_switches_face_repair_off(tmp_path):
     # YAML reads `off` as false; the setting still understands it.
     assert load_settings(write(tmp_path, "face_repair:\n  mode: off\n")).face_repair.mode == "off"
+
+
+def test_the_24gb_config_is_found_by_name_from_any_folder(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    assert find_config("24gb.yaml") == CONFIGS / "24gb.yaml"
+    assert load_settings("24gb.yaml").generation.transformer == "gguf"
+
+
+def test_a_users_own_config_wins_over_a_ready_made_one(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    write(tmp_path, "seed: 7\n", name="24gb.yaml")
+
+    settings = load_settings("24gb.yaml")
+
+    assert (settings.seed, settings.generation.transformer) == (7, "bf16")
+
+
+def test_only_bare_names_fall_back_to_ready_made_configs(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        load_settings(tmp_path / "24gb.yaml")
+    with pytest.raises(FileNotFoundError):
+        load_settings("missing.yaml")
