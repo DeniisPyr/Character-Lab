@@ -167,12 +167,14 @@ def _generate(args: argparse.Namespace) -> int:
 
 
 def duration(seconds: float) -> str:
-    """6 min 12 s, 48 s or 1 h 3 min."""
+    """6 min 12 s, 48 s, 2 min, 1 h 3 min or 1 h; a part that is zero is left out."""
     minutes, rest = divmod(round(seconds), 60)
     hours, minutes = divmod(minutes, 60)
     if hours:
-        return f"{hours} h {minutes} min"
-    return f"{minutes} min {rest} s" if minutes else f"{rest} s"
+        return f"{hours} h {minutes} min" if minutes else f"{hours} h"
+    if minutes:
+        return f"{minutes} min {rest} s" if rest else f"{minutes} min"
+    return f"{rest} s"
 
 
 def shell_arg(text: str) -> str:

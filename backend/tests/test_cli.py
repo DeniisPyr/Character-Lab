@@ -330,7 +330,16 @@ def test_eval_reports_a_missing_dataset_or_reference(capsys, reference, tmp_path
 
 
 @pytest.mark.parametrize(
-    ("seconds", "text"), [(48.4, "48 s"), (372, "6 min 12 s"), (3790, "1 h 3 min")]
+    ("seconds", "text"),
+    [
+        (48.4, "48 s"),
+        (372, "6 min 12 s"),
+        (3790, "1 h 3 min"),
+        (120, "2 min"),
+        (59.6, "1 min"),
+        (3600, "1 h"),
+        (0.2, "0 s"),
+    ],
 )
 def test_durations_read_naturally(seconds, text):
     assert cli.duration(seconds) == text
